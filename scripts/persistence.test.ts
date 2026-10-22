@@ -45,6 +45,10 @@ test('offline saves survive restart; recovery, revision retry and conflicts pres
   const local=copy(remote);local.design.sections[0].notes='mine';await p.save(local,remote);
   remote.design.sections[0].notes='theirs';revision++;await p.sync();assert.equal(p.view().status,'conflict');assert.equal(p.view().data.design.sections[0].notes,'mine');
   await p.resolve('cloud');assert.equal(p.view().data.design.sections[0].notes,'theirs');
+  const stale=copy(p.view().data);remote.design.sections[0].notes='new remote';revision++;await p.sync();
+  const edit=copy(stale);edit.design.sections[0].notes='stale renderer edit';
+  const result=await p.save(edit,stale);assert.equal(result.status,'conflict');assert.equal(result.data.design.sections[0].notes,'stale renderer edit');
+  await p.resolve('cloud');assert.equal(p.view().data.design.sections[0].notes,'new remote');
   assert.ok(JSON.parse(await readFile(cache,'utf8')).data);
  }finally{await p.close();await rm(dir,{recursive:true,force:true});}
 });

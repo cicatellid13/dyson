@@ -61,7 +61,15 @@ export class Persistence {
   }
   async save(value: unknown, base: unknown) {
     if (!this.cache) throw Error('Storage is not ready.');
-    this.cache.data = mergeWorkspace(validateWorkspace(base), validateWorkspace(value), this.cache.data);
+    const previous = validateWorkspace(base), next = validateWorkspace(value);
+    try { this.cache.data = mergeWorkspace(previous, next, this.cache.data); }
+    catch {
+      // A remote update can reach main before the renderer receives its event.
+      await writeFile(this.cachePath + `.conflict-${Date.now()}.json`, JSON.stringify(this.cache), { mode: 0o600 });
+      this.cache.base = previous; this.cache.data = next;
+      this.status = 'conflict';
+      this.message = 'Another machine changed this data while you were editing. Your local copy is preserved. Choose which version to keep.';
+    }
     if (this.status !== 'conflict') { this.status = 'pending'; this.message = ''; }
     await this.persist();
     clearTimeout(this.timer);
