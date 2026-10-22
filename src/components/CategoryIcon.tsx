@@ -13,5 +13,5 @@ export function CategoryIcon({ category }: { category: string }) {
     'Dark Fog': 'M4 8c0-3 4-5 7-3 3-4 8-1 7 3 4 0 5 6 1 7M3 12h9M5 16h11M8 20h12',
     'Science Matrices': 'm12 2 9 5v10l-9 5-9-5V7l9-5Zm0 0v10m-9 5 9-5 9 5M3 7l9 5 9-5M12 12v10',
   };
-  return <svg className="category-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={paths[category] ?? 'M5 5h14v14H5z'}/></svg>;
+  return <svg className="category-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{category === 'Logistics Network' ? <><circle cx="12" cy="4.5" r="2.5"/><circle cx="19.5" cy="12" r="2.5"/><circle cx="12" cy="19.5" r="2.5"/><circle cx="4.5" cy="12" r="2.5"/><path d="m10.2 6.3-3.9 3.9m7.5-3.9 3.9 3.9m0 3.6-3.9 3.9m-7.5-3.9 3.9 3.9"/></> : <path d={paths[category] ?? 'M5 5h14v14H5z'}/>}</svg>;
 }
