@@ -1,134 +1,93 @@
-# Dyson Sphere Program Wiki Desktop — Product Specification
+# DSP Fieldguide — Offline recipe reference
 
-**Version:** 1.0  
-**Status:** Implemented baseline (MVP)  
-**Reference:** [Dyson Sphere Program Wiki (Fandom)](https://dyson-sphere-program.fandom.com/wiki/Dyson_Sphere_Program_Wiki)
+## User outcome
+Find an item, see exactly what builds it, and follow ingredients through their production chain without an internet connection.
 
-## 1. Purpose
+## Data contract
+Bundle a versioned snapshot of the Fandom Module:Recipe/Data and local image files (PNG/WebP/JPEG). Catalog is imported into the application bundle, avoiding even a file:// JSON fetch. No runtime wiki calls. Preserve source revision and date. Refresh is an explicit maintainer action using `python3 scripts/import-wiki.py`; failures must not replace the catalog. Wiki content attribution is visible in-app.
 
-Deliver a cross-platform desktop application (macOS and Windows) that lets players browse and search the official community wiki without relying on a generic web browser tab. The app uses the wiki’s public MediaWiki API; it does not scrape HTML or redistribute wiki content offline.
+## Acceptance criteria
+- First launch offline shows all enabled items and buildings, with bundled icons.
+- Search by name/description and category filters run locally.
+- Selecting an item shows description, stack size, recipes, exact input/output quantities, crafting time, facility and unlock technology.
+- Multiple-output and alternate recipes are visible, without confusing byproducts with required inputs.
+- Required input clicks expand/collapse recipes inline, recursively, without leaving the selected building/item. Nested quantities scale with the target, alternate recipes can be selected per branch, and circular chains stop with an explanation. Output/facility/used-in links still navigate; back restores the prior item.
+- Quantity scales whole crafting batches, showing actual output and ingredients.
+- Expandable production tree uses default recipes, clearly indicates its assumptions, and stops cycles.
+- Used-in list and favorites work locally; favorites persist across restarts.
+- macOS and Windows use Electron with isolated, sandboxed renderer. Only validated HTTP(S) source links open externally.
+- Build/typecheck and catalog consistency checks pass; test local navigation and offline image loading.
 
-## 2. Goals and non-goals
+## Scope
+Recipe reference, not a factory throughput optimizer or a full offline wiki mirror. Recipe times are base values; production speeds and proliferator bonuses are not applied. Extraction sources are displayed for non-crafted resources.
 
-### Goals
+## Defense item presentation
+Turrets, defense buildings, ammunition, combat drones/ships, and combustible/explosive units are desaturated and muted in every item presentation, including favorites, input expansions, outputs, and production chains. They retain mouse and keyboard interaction. Shared industrial ingredients and Dark Fog materials retain normal styling.
 
-- Search wiki pages by title and content snippets.
-- Read article HTML rendered in-app with readable typography.
-- Quick access to high-traffic entry points (home, Components, Buildings, Technology).
-- Open the same article on the live wiki in the system browser.
-- Remember recent articles locally (no account required).
+Catalog lists (All items, every category, Favorites, and filtered search results) place muted defense items after other items, with alphabetical ordering within each group.
 
-### Non-goals (v1)
+## Design workspace
+- Design appears directly below Favorites.
+- Create named standalone planets or systems. Systems can contain multiple named planets (one level deep).
+- Every system and planet independently stores editable notes and import/export item lists.
+- Trade entries have a catalog item, optional nonnegative amount, unit (items/min, items/s, items), and optional source/destination label. Add/edit/remove entries locally.
+- Gray defense items retain their styling in trade entries and sort last in item choices and lists.
+- Changes save immediately on this device and survive workspace changes and restarts. Failed writes show an explicit warning and retry; unreadable existing data is preserved.
+- Section deletion requires inline confirmation, includes child planets for a system, and offers Undo.
+- Verify hierarchy persistence, independent notes/lists, quantity edits, child creation, removal/undo, and switching back to the item library.
 
-- Offline full mirror of the wiki.
-- Editing wiki pages or login to Fandom.
-- Recipe/planning calculators (may be a future spec).
+Import/export item pickers use custom dark menus with item names on the left and local icons on the right. Search, mouse selection, arrow-key navigation, Enter, Escape, outside-focus dismissal, and gray-last ordering are supported.
 
-## 3. Users and scenarios
+### Trade route planet selection
+- To/From use two dark selectors: system, then a planet in that system. Only existing planets can be selected; standalone planets appear under “Standalone planets”. Empty systems explain that no planets exist yet.
+- Store a planet ID so renaming a planet or system keeps routes connected. Switching systems clears the selected planet. Deleted planets show an unresolved-route message rather than silently pointing elsewhere.
+- Preserve previous free-text destinations as a read-only migration hint until a created planet is selected. Routes remain optional.
 
-| ID | Scenario | Acceptance |
-|----|----------|------------|
-| U1 | Player looks up an item while planning a factory | Search returns relevant pages; opening one shows content within 3s on typical network |
-| U2 | New player explores wiki structure | Sidebar shortcuts open known category/hub pages |
-| U3 | Player shares a link with a friend | “Open in browser” uses canonical Fandom URL |
-| U4 | Player revisits yesterday’s research | Recent list shows last 20 titles; click restores article |
+### System-first planet creation
+- The global creation action is + System. Planets can only be created from an existing system's + Add planet action.
+- Display the planet name form inside that system's planet section, explicitly naming the parent system. After creation, open the planet and show it nested beneath its system. Navigation cancels an unfinished creation form.
+- Validate that the parent is an existing system before adding a planet. Existing standalone planets remain readable under “Needs a system”, with a system assignment selector preserving IDs, notes, and routes.
 
-## 4. Technical architecture
+### Contextual sidebar planet creation
+- Selecting a system or one of its planets shows the current system in the sidebar and enables + Planet there.
+- Sidebar + Planet opens a sidebar form explicitly showing “Adding to [system]”. The parent is automatically the selected planet's system (or the selected system), never the planet itself.
+- System-page + Add planet retains its inline form. Only one creation form is shown at a time; navigation dismisses it. Creation opens the new planet, nested under its system, with the current-system indicator retained.
+- With no current system (including legacy unassigned planets), sidebar planet creation is unavailable.
 
-```
-┌─────────────────────────────────────────────────────────┐
-│  Electron Main Process                                   │
-│  - Window lifecycle, external URL handler                │
-│  - Optional: IPC for future cache                        │
-└──────────────────────────┬──────────────────────────────┘
-                           │
-┌──────────────────────────▼──────────────────────────────┐
-│  Renderer (React + TypeScript)                           │
-│  - UI state, routing (in-memory)                         │
-│  - WikiClient → MediaWiki Action API (HTTPS)             │
-└─────────────────────────────────────────────────────────┘
-                           │
-                           ▼
-              dyson-sphere-program.fandom.com/api.php
-```
+### Planet card trade previews
+- System planet cards show every import and export entry, replacing numeric counts. Imports display icon + item name + right arrow; exports display left arrow + item name + icon.
+- Label each list Imports/Exports and show None for empty lists. Use bundled item icons. Defense entries remain gray, clickable through the planet card, and sorted last within each list.
+- Cards grow to show all entries, wrap long names, and still open their planet when clicked.
+- Trade card layout refinement: both lists, labels, icons, and item names align left. Arrow badges sit on the right for both lists: blue right-pointing imports and green left-pointing exports, with SVG double chevrons, motion trails, and a subtle glow.
 
-**Stack:** Electron 33+, Vite, React 18, TypeScript.  
-**API base:** `https://dyson-sphere-program.fandom.com/api.php`  
-**Article URLs:** `https://dyson-sphere-program.fandom.com/wiki/{encodedTitle}`
+- Selected arrow style: Heavy industrial, a bold single arrow without a badge, glow, or trails. Blue imports point left; green exports point right. Both remain at the right edge, with item names and icons aligned left. This supersedes previous arrow direction and styling specifications.
 
-## 5. External API contract
+### Per-planet card filters
+- Each planet card in a system has independent Trade (All trades / Imports / Exports) and Item filters; combine them to filter the displayed rows without changing saved trade data.
+- Item choices contain only unique IDs currently imported or exported by that planet, sorted by name with defense items last. Keep both directions in the item choices so a selected direction can clearly report no matches.
+- Offer Clear filters, disable the item selector for planets without trades, and safely fall back to All items if a selected item no longer exists in that planet's lists.
+- Use an explicit Open planet header button, keeping filter controls separate from navigation. Preserve left-aligned item icons and names and right-side blue import / green export arrows.
 
-All requests: `format=json`, `origin=*` where applicable, descriptive `User-Agent` per [MediaWiki etiquette](https://www.mediawiki.org/wiki/API:Etiquette).
+### Logistics bubble filters
+- Replace the Logistics dropdown with blue left-arrow Imports and green right-arrow Exports circular toggle buttons using the Heavy industrial arrows.
+- Initially neither is pressed and both trade lists appear. Clicking one highlights it and filters to that direction; clicking it again clears the direction filter. Clicking the other switches direction. Clear filters resets both buttons and the item choice.
+- Show an Imports/Exports tooltip on hover or keyboard focus, including the click action. Buttons expose accessible names and pressed states. Item filtering remains independent.
 
-### 5.1 Search
+### Dependent item filter
+- Planet card Item uses the shared dark searchable ItemPicker, including local icons on the right, keyboard selection, and gray defense items last.
+- Options come only from the selected direction's entries, or both lists when neither direction is selected. Changing direction clears an item that is no longer available, retaining a valid selection.
+- Empty search means All items. Offer an item-only reset as well as Clear filters. Opening a new direction resets the open menu and keyboard highlight.
 
-- **Endpoint:** `action=query&list=search&srsearch={query}&srlimit=20`
-- **Response use:** `query.search[].title`, `snippet` (HTML entities decoded for display)
+### Sidebar symbols and concise tooltips
+- Logistics bubble tooltips contain only Imports or Exports.
+- Each category below Buildings uses a distinct line icon: crystal, ingots, chip, package, transport arrows, factory, ornament, turret, shield, fog, and matrix. Icons inherit sidebar colors, remain decorative for accessibility, and require no remote assets.
 
-### 5.2 Page content
+### Dark Fog sidebar preference
+- A compact Dark Fog switch sits at the bottom of the main sidebar, below the attribution footer. Default off; persist locally under dsp-dark-fog.
+- On shows Turrets, Defense, and Dark Fog categories. Off hides all three and returns to All items if a hidden category was selected.
+- This switch changes category visibility only. Items remain available, and existing defense-item grayscale and ordering rules continue to apply.
 
-- **Endpoint:** `action=parse&page={title}&prop=text|displaytitle&disableeditsection=1`
-- **Response use:** `parse.text['*']` injected into sandboxed article container; rewrite relative `/wiki/` links to in-app navigation
-
-### 5.3 Open search (autocomplete)
-
-- **Endpoint:** `action=opensearch&search={query}&limit=10`
-- **Response use:** `[]` titles array for typeahead
-
-### 5.4 Errors
-
-| Condition | UX |
-|-----------|-----|
-| Network failure | Banner: “Could not reach the wiki. Check your connection.” |
-| Empty search | Empty state with search tips |
-| Missing page (API error) | Message + link to open search on Fandom |
-
-## 6. UI specification
-
-### 6.1 Layout
-
-- **Shell:** Title bar region (drag), left sidebar (~240px), main content.
-- **Sidebar:** App title, search field, shortcuts (Home, Components, Buildings, Technology), recent articles list.
-- **Main:** Article title, toolbar (Back if history stack, Refresh, Open in browser), scrollable article body.
-
-### 6.2 Theming
-
-- Dark theme aligned with DSP / sci-fi aesthetic (deep blue-gray background, cyan accent).
-- Article body: max-width ~800px, comfortable line height, wiki tables horizontally scrollable.
-
-### 6.3 Navigation
-
-- In-app wiki links (`href` starting with `/wiki/`): intercept click → load via API.
-- External links: open via `shell.openExternal`.
-- Internal history stack: back button pops stack (not system back).
-
-## 7. Platform requirements
-
-| Platform | Minimum |
-|----------|---------|
-| macOS | 11+ (Big Sur), arm64 or x64 |
-| Windows | 10+, x64 |
-
-Build targets via `electron-builder`: `dmg`/`zip` (mac), `nsis` (win).
-
-## 8. Privacy and compliance
-
-- No analytics in v1.
-- Recent articles stored in `localStorage` only on device.
-- User-Agent identifies app name and version for wiki operators.
-
-## 9. Verification (test plan)
-
-- [ ] App launches on macOS dev build (`npm run dev`).
-- [ ] Search “Iron Ore” returns results; opening shows article body.
-- [ ] Shortcut “Components” loads expected hub page.
-- [ ] Click in-article wiki link navigates without leaving app.
-- [ ] External link opens default browser.
-- [ ] Recent list updates after viewing pages.
-- [ ] Production build scripts documented in README.
-
-## 10. Future spec candidates
-
-- Favorites / pinned pages sync.
-- Full-text offline cache with TTL.
-- Production chain graph from wiki templates.
+### Dark Fog visibility throughout the app
+- Off excludes combat-only items and Dark Fog category items from the catalog view, favorites, counts, item details, recipes, production chains, facility links, and every logistics list and picker. Recipes requiring excluded items are omitted rather than showing incomplete ingredients.
+- On restores items in full color and normal alphabetical order. All items and Favorites counts reflect visible items.
+- Hidden favorites and saved logistics entries are preserved. Editing visible logistics entries must not delete hidden entries. Turning off clears hidden item selection/history and transient logistics searches.

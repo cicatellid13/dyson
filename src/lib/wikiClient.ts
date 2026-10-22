@@ -1,4 +1,5 @@
 import { USER_AGENT, WIKI_API } from "./constants";
+import { prepareWikiHtml } from "./prepareWikiHtml";
 
 export type SearchHit = {
   title: string;
@@ -120,7 +121,7 @@ export async function fetchPage(title: string): Promise<ParsedPage> {
   return {
     title: parse.title,
     displayTitle: parse.displaytitle ?? parse.title,
-    html: parse.text["*"],
+    html: prepareWikiHtml(parse.text["*"]),
   };
 }
 

@@ -7,10 +7,12 @@
   "license": "MIT",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && electron-builder",
-    "build:dir": "vite build && electron-builder --dir",
+    "build": "npm run typecheck && npm test && vite build && electron-builder",
+    "build:dir": "npm run typecheck && npm test && vite build && electron-builder --dir",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit"
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit",
+    "test": "node --test scripts/catalog.test.mjs scripts/design.test.mjs",
+    "data:refresh": "python3 scripts/import-wiki.py"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -29,20 +31,31 @@
   },
   "build": {
     "appId": "com.dsp.wiki.desktop",
-    "productName": "DSP Wiki",
+    "productName": "DSP Fieldguide",
     "directories": {
       "output": "release"
     },
     "mac": {
       "category": "public.app-category.reference",
-      "target": ["dmg", "zip"]
+      "target": [
+        "dmg",
+        "zip"
+      ]
     },
     "win": {
-      "target": ["nsis"]
+      "target": [
+        "nsis"
+      ],
+      "artifactName": "DSP-Fieldguide-Setup.exe"
     },
     "files": [
       "dist/**/*",
       "dist-electron/**/*"
-    ]
+    ],
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "runAfterFinish": true
+    }
   }
 }

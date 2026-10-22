@@ -1,269 +1,123 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { HOME_PAGE, SHORTCUTS } from "./lib/constants";
-import { loadRecents, pushRecent } from "./lib/recents";
-import {
-  browserUrlForTitle,
-  openInBrowser,
-  titleFromWikiHref,
-} from "./lib/wikiLinks";
-import {
-  fetchPage,
-  searchWiki,
-  suggestTitles,
-  WikiError,
-  type ParsedPage,
-  type SearchHit,
-} from "./lib/wikiClient";
+import { CategoryIcon } from './components/CategoryIcon';
+import { useEffect, useMemo, useState } from 'react';
+import { batchesFor, pairs, recipesFor, isDefenseItem, catalogForDarkFog, type Catalog, type Item } from './lib/catalog';
+import snapshot from '../public/data/catalog.json';
+import { Design } from './components/Design';
+import { openInBrowser, browserUrlForTitle } from './lib/wikiLinks';
 
-export function App() {
-  const [query, setQuery] = useState("");
-  const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [searchResults, setSearchResults] = useState<SearchHit[] | null>(null);
-  const [page, setPage] = useState<ParsedPage | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [recents, setRecents] = useState<string[]>(() => loadRecents());
-  const [history, setHistory] = useState<string[]>([]);
-  const debounceRef = useRef<number | null>(null);
-
-  const loadTitle = useCallback(async (title: string, pushHistory = true) => {
-    setLoading(true);
-    setError(null);
-    setSearchResults(null);
-    setSuggestions([]);
-
-    if (pushHistory && page?.title && page.title !== title) {
-      setHistory((h) => [...h, page.title]);
-    }
-
-    try {
-      const parsed = await fetchPage(title);
-      setPage(parsed);
-      setRecents(pushRecent(parsed.title));
-    } catch (e) {
-      const message =
-        e instanceof WikiError ? e.message : "Failed to load page.";
-      setError(message);
-      setPage(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [page?.title]);
-
-  useEffect(() => {
-    void loadTitle(HOME_PAGE, false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- initial home load only
-  }, []);
-
-  useEffect(() => {
-    if (debounceRef.current) {
-      window.clearTimeout(debounceRef.current);
-    }
-    if (!query.trim()) {
-      setSuggestions([]);
-      return;
-    }
-    debounceRef.current = window.setTimeout(() => {
-      void suggestTitles(query).then(setSuggestions).catch(() => setSuggestions([]));
-    }, 250);
-    return () => {
-      if (debounceRef.current) {
-        window.clearTimeout(debounceRef.current);
-      }
-    };
-  }, [query]);
-
-  const onSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const q = query.trim();
-    if (!q) {
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    void searchWiki(q)
-      .then((hits) => {
-        setSearchResults(hits);
-        if (hits.length === 1) {
-          void loadTitle(hits[0].title);
-        }
-      })
-      .catch((err: unknown) => {
-        setError(err instanceof WikiError ? err.message : "Search failed.");
-      })
-      .finally(() => setLoading(false));
-  };
-
-  const goBack = () => {
-    setHistory((h) => {
-      const next = [...h];
-      const prev = next.pop();
-      if (prev) {
-        void loadTitle(prev, false);
-      }
-      return next;
-    });
-  };
-
-  const onArticleClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    const target = e.target as HTMLElement;
-    const anchor = target.closest("a");
-    if (!anchor) {
-      return;
-    }
-    const href = anchor.getAttribute("href");
-    if (!href) {
-      return;
-    }
-
-    const title = titleFromWikiHref(href);
-    if (title) {
-      e.preventDefault();
-      void loadTitle(title);
-      return;
-    }
-
-    if (href.startsWith("http://") || href.startsWith("https://")) {
-      e.preventDefault();
-      openInBrowser(href);
-    }
-  };
-
-  const displayTitle = page?.displayTitle.replace(/<[^>]+>/g, "") ?? "DSP Wiki";
-
-  return (
-    <div className="app">
-      <aside className="sidebar">
-        <header className="sidebar-header">
-          <h1>DSP Wiki</h1>
-          <p className="subtitle">Dyson Sphere Program</p>
-        </header>
-
-        <form className="search-form" onSubmit={onSearchSubmit}>
-          <input
-            type="search"
-            placeholder="Search the wiki…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            aria-label="Search wiki"
-          />
-          <button type="submit" disabled={loading}>
-            Search
-          </button>
-        </form>
-
-        {suggestions.length > 0 && (
-          <ul className="suggestions" role="listbox">
-            {suggestions.map((title) => (
-              <li key={title}>
-                <button type="button" onClick={() => void loadTitle(title)}>
-                  {title}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        <nav className="shortcuts" aria-label="Wiki shortcuts">
-          {SHORTCUTS.map(({ label, page: pageTitle }) => (
-            <button
-              key={pageTitle}
-              type="button"
-              className={
-                page?.title === pageTitle ? "shortcut active" : "shortcut"
-              }
-              onClick={() => void loadTitle(pageTitle)}
-            >
-              {label}
-            </button>
-          ))}
-        </nav>
-
-        {recents.length > 0 && (
-          <section className="recents">
-            <h2>Recent</h2>
-            <ul>
-              {recents.map((title) => (
-                <li key={title}>
-                  <button type="button" onClick={() => void loadTitle(title)}>
-                    {title}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-      </aside>
-
-      <main className="main">
-        <header className="toolbar">
-          <div className="toolbar-left">
-            <button
-              type="button"
-              className="ghost"
-              disabled={history.length === 0}
-              onClick={goBack}
-            >
-              ← Back
-            </button>
-            <h2>{displayTitle}</h2>
+function Icon({item,large=false}:{item?:Item;large?:boolean}) {
+  const [failed,setFailed]=useState(false);
+  useEffect(()=>setFailed(false),[item?.id]);
+  return <span className={`item-icon ${large?'large':''} ${isDefenseItem(item)?'defense-icon':''}`}>{item?.icon&&!failed?<img src={`${import.meta.env.BASE_URL}${item.icon}`} alt="" onError={()=>setFailed(true)}/>:<span>{item?.name.slice(0,2)??'◇'}</span>}</span>;
+}
+function ExpandableInput({ catalog, itemMap, id, count, path }: {
+  catalog: Catalog; itemMap: Map<number, Item>; id: number; count: number; path: number[];
+}) {
+  const [open, setOpen] = useState(false);
+  const [chosenRecipe, setChosenRecipe] = useState<number | null>(null);
+  const item = itemMap.get(id);
+  const options = recipesFor(catalog, id);
+  const recipe = options.find(r => r.id === chosenRecipe) ?? options[0];
+  const cycle = path.includes(id);
+  const batches = recipe ? batchesFor(recipe, id, count) : 0;
+  return <div className="inline-input">
+    <button className={`ingredient ${isDefenseItem(item)?'defense-item':''}`} aria-expanded={open} onClick={() => setOpen(value => !value)}>
+      <Icon item={item}/><span>{item?.name ?? `Item ${id}`}</span>
+      <b>× {count.toLocaleString()}</b><span className="chevron" aria-hidden="true">{open ? '▾' : '▸'}</span>
+    </button>
+    {open && <div className="inline-recipe">
+      {cycle ? <p className="note">This ingredient repeats in the chain. Supply it separately to avoid a circular recipe.</p>
+        : !recipe ? <p className="note">{item?.mining_from ?? item?.explicit_produce_from ?? 'Gather / supply directly — no crafting recipe listed.'}</p>
+        : <>
+          {options.length > 1 && <label className="inline-choice">Recipe for {item?.name}
+            <select className={isDefenseItem(item)?'defense-item':''} value={recipe.id} onChange={event => setChosenRecipe(Number(event.target.value))}>
+              {options.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+            </select>
+          </label>}
+          <p className="note">{batches.toLocaleString()} batch{batches === 1 ? '' : 'es'} · {recipe.seconds}s per batch · {catalog.facilities[recipe.type]?.name ?? recipe.type}
+            {recipe.type === 'FRACTIONATE' && ' · Expected statistical yields'}
+          </p>
+          <div className="section-label">REQUIRES</div>
+          <div className="ingredients" key={recipe.id}>
+            {pairs(recipe.inputs).map(input => <ExpandableInput key={input.id} catalog={catalog} itemMap={itemMap} id={input.id} count={input.count * batches} path={[...path, id]}/>)}
           </div>
-          <div className="toolbar-right">
-            <button
-              type="button"
-              className="ghost"
-              disabled={!page || loading}
-              onClick={() => page && void loadTitle(page.title, false)}
-            >
-              Refresh
-            </button>
-            <button
-              type="button"
-              className="primary"
-              disabled={!page}
-              onClick={() => page && openInBrowser(browserUrlForTitle(page.title))}
-            >
-              Open in browser
-            </button>
-          </div>
-        </header>
+          <p className="note">Produces {pairs(recipe.outputs).map((output, index) => <span key={output.id} className={isDefenseItem(itemMap.get(output.id))?'defense-item':''}>{index > 0 ? ', ' : ''}{(output.count * batches).toLocaleString()} × {itemMap.get(output.id)?.name ?? output.id}</span>)}</p>
+        </>}
+    </div>}
+  </div>;
+}
+function readFavorites():number[] { try { const data=JSON.parse(localStorage.getItem('dsp-favorites')??'[]'); return Array.isArray(data)?data.filter(x=>typeof x==='number'):[]; } catch {return [];} }
 
-        {error && (
-          <div className="banner error" role="alert">
-            {error}
-          </div>
-        )}
+export function App(){
 
-        {loading && <div className="loading">Loading from Fandom…</div>}
+ const [error,setError]=useState('');
+ const [query,setQuery]=useState('');
+ const [category,setCategory]=useState('All items');
+ const [darkFog,setDarkFog]=useState(()=>{try{return localStorage.getItem('dsp-dark-fog')==='true';}catch{return false;}});
+ function toggleDarkFog(){
+  const next=!darkFog;setDarkFog(next);
+  if(!next&&['Turrets','Defense','Dark Fog'].includes(category))setCategory('All items');
+  try{localStorage.setItem('dsp-dark-fog',String(next));}catch{setError('Your Dark Fog preference could not be saved on this device.');}
+ }
+ const catalog=useMemo(()=>catalogForDarkFog(snapshot as unknown as Catalog,darkFog),[darkFog]);
+ const [selected,setSelected]=useState(1303);
+ const [history,setHistory]=useState<number[]>([]);
+ const [favorites,setFavorites]=useState(readFavorites);
+ const [recipeId,setRecipeId]=useState<number|null>(null);
+ const [quantity,setQuantity]=useState(1);
+ const [tab,setTab]=useState<'recipe'|'chain'>('recipe');
 
-        {searchResults && !loading && (
-          <section className="search-results">
-            <h3>Search results</h3>
-            {searchResults.length === 0 ? (
-              <p>No pages matched. Try a different term.</p>
-            ) : (
-              <ul>
-                {searchResults.map((hit) => (
-                  <li key={hit.title}>
-                    <button type="button" onClick={() => void loadTitle(hit.title)}>
-                      <strong>{hit.title}</strong>
-                      {hit.snippet && <span>{hit.snippet}</span>}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        )}
-
-        {page && !searchResults && (
-          <article
-            className="wiki-article"
-            onClick={onArticleClick}
-            dangerouslySetInnerHTML={{ __html: page.html }}
-          />
-        )}
-      </main>
-    </div>
-  );
+ const itemMap=useMemo(()=>new Map(catalog?.items.map(i=>[i.id,i])),[catalog]);
+ useEffect(()=>{
+  if(!itemMap.has(selected)){setSelected(itemMap.has(1303)?1303:catalog.items[0].id);setRecipeId(null);setQuantity(1);}
+  setHistory(previous=>previous.filter(id=>itemMap.has(id)));
+ },[itemMap,selected]);
+ const item=itemMap.get(selected);
+ const recipes=catalog?recipesFor(catalog,selected):[];
+ const recipe=recipes.find(r=>r.id===recipeId)??recipes[0];
+ const batches=recipe?batchesFor(recipe,selected,quantity):0;
+ function navigate(id:number,back=false){ if(!itemMap.has(id))return; if(!back&&id!==selected)setHistory(h=>[...h,selected]);setSelected(id);setRecipeId(null);setQuantity(1); }
+ function favorite(){const next=favorites.includes(selected)?favorites.filter(i=>i!==selected):[...favorites,selected];setFavorites(next);try{localStorage.setItem('dsp-favorites',JSON.stringify(next));}catch{setError('Your favorites could not be saved on this device.');}}
+ const categories=['All items','Favorites','Logistics Network','Buildings',...Object.values(catalog?.categories??{}).filter(c=>c!=='Unknown Category'&&(darkFog||!['Turrets','Defense','Dark Fog'].includes(c)))];
+ const searchPlaceholders:Record<string,string>={
+  'All items':'Find an item or building…',
+  'Favorites':'Search your favorites…',
+  'Buildings':'Find a building…',
+  'Natural Resources':'Find a natural resource…',
+  'Materials':'Find a material…',
+  'Components':'Find a component…',
+  'End Products':'Find an end product…',
+  'Logistics':'Find a logistics item…',
+  'Production Facilities':'Find a production facility…',
+  'Decorations':'Find a decoration…',
+  'Turrets':'Find a turret…',
+  'Defense':'Find a defense item…',
+  'Dark Fog':'Find a Dark Fog item…',
+  'Science Matrices':'Find a science matrix…',
+ };
+ const searchPlaceholder=searchPlaceholders[category]??`Search ${category.toLowerCase()}…`;
+ const visible=catalog?.items.filter(i=>(category==='All items'||category==='Favorites'&&favorites.includes(i.id)||category==='Buildings'&&i.can_build||catalog.categories[i.type]===category)&&`${i.name} ${i.description}`.toLowerCase().includes(query.toLowerCase())).sort((a,b)=>a.name.localeCompare(b.name))??[];
+ const uses=catalog?.recipes.filter(r=>pairs(r.inputs).some(p=>p.id===selected))??[];
+ function chip(id:number,count?:number){const target=itemMap.get(id);return <button className={`ingredient ${isDefenseItem(target)?'defense-item':''}`} key={id} onClick={()=>navigate(id)}><Icon item={target}/><span>{target?.name??`Item ${id}`}</span>{count!==undefined&&<b>× {count.toLocaleString()}</b>}<span className="chevron">↗</span></button>;}
+ function tree(id:number,count:number,path:number[],depth=0):React.ReactNode {
+  const target=itemMap.get(id);const cycle=path.includes(id);const r=depth===0?recipe:catalog&&recipesFor(catalog,id)[0];
+  if(cycle||!r||depth>=8)return <div className="tree-leaf">{chip(id,count)}<small>{cycle?'Cycle — supply this ingredient separately':depth>=8?'Depth limit — open item to continue':target?.mining_from??'Gather / supply directly'}</small></div>;
+  const b=batchesFor(r,id,count);
+  return <details className="tree-node" open={depth<2} key={`${id}-${depth}`}><summary className={isDefenseItem(target)?'defense-item':''}><Icon item={target}/><strong>{target?.name}</strong><span>× {count.toLocaleString()}</span><small>{b} batch{b!==1?'es':''} · {r.seconds*b}s</small></summary><div>{pairs(r.inputs).map(p=><div key={p.id}>{tree(p.id,p.count*b,[...path,id],depth+1)}</div>)}</div></details>;
+ }
+ if(!catalog)return <div className="boot"><div className="brand-orbit">◉</div><h1>DSP Fieldguide</h1><p>{error||'Opening your local item library…'}</p>{error&&<button onClick={()=>location.reload()}>Try again</button>}</div>;
+ return <div className="app-shell dark-fog-normal">
+ <aside className="sidebar"><div className="brand"><span className="brand-orbit">◉</span><div><strong>FIELDGUIDE</strong><small>DYSON SPHERE PROGRAM</small></div></div><div className="nav-caption">YOUR LIBRARY</div><nav aria-label="Item categories">{categories.filter(c=>['All items','Favorites','Logistics Network','Buildings'].includes(c)||catalog.items.some(i=>catalog.categories[i.type]===c)).map((c,index)=><button className={category===c?'nav active':'nav'} key={c} onClick={()=>setCategory(c)}><span>{index===0?'▦':index===1?'☆':c==='Logistics Network'?'✧':c==='Buildings'?'▤':<CategoryIcon category={c}/>}</span>{c}<small>{c==='All items'?catalog.items.length:c==='Favorites'?favorites.filter(id=>itemMap.has(id)).length:''}</small></button>)}</nav><div className="offline"><span className="status-dot"/> Available offline<small>Catalog & images stored on this device</small></div><footer>Data from DSP Wiki contributors.<br/><a href="https://www.fandom.com/licensing" onClick={e=>{e.preventDefault();openInBrowser(e.currentTarget.href);}}>Content attribution & licensing ↗</a></footer><button type="button" className="dark-fog-toggle" role="switch" aria-checked={darkFog} onClick={toggleDarkFog}><span className="dark-fog-switch" aria-hidden="true"/><span>Dark Fog</span></button></aside>
+ <main className="workspace"><header className="topbar"><span>FACTORY REFERENCE <span className="slash">/</span> {category==='Logistics Network'?'LOGISTICS NETWORK':'ITEM LIBRARY'}</span><span className="edition">LOCAL EDITION <span className="status-dot"/></span></header><section className="sphere-header" aria-label="Dysons Sphere">
+   <img className="sphere-galaxy" src={`${import.meta.env.BASE_URL}art/galaxy-header.png`} alt="Panoramic galaxy surrounding a brilliant golden star with orbital collectors for a Dyson sphere"/>
+   <div className="sphere-title"><span className="twinkling-star" aria-hidden="true">✦</span><h1>Dysons Sphere</h1></div>
+ </section>
+ {error&&<div className="error" role="alert">{error}</div>}
+ {category==='Logistics Network'?<Design catalog={catalog}/>:<div className="browser-layout"><section className="catalog-panel"><div className="catalog-tools"><label className="search"><span>⌕</span><input type="search" aria-label={`Search ${category.toLowerCase()}`} placeholder={searchPlaceholder} value={query} onChange={e=>setQuery(e.target.value)}/><kbd>⌕</kbd></label><div className="list-heading"><h2>{category}</h2><span>{visible.length} items</span></div></div><div className="item-list">{visible.map(i=><button key={i.id} className={`item-row ${selected===i.id?'selected':''} ${isDefenseItem(i)?'defense-item':''}`} onClick={()=>navigate(i.id)}><Icon item={i}/><span><strong>{i.name}</strong><small>{catalog.categories[i.type]??i.type}</small></span><span className="row-arrow">{favorites.includes(i.id)?'★':'›'}</span></button>)}{!visible.length&&<div className="empty"><h3>No items here yet</h3><p>{category==='Favorites'?'Star an item to keep it close.':'Try a different name or category.'}</p><button onClick={()=>{setQuery('');setCategory('All items');}}>Show all items</button></div>}</div></section>
+ {item&&<section className="detail-panel" key={item.id}><div className="detail-actions"><button disabled={!history.length} onClick={()=>{const prev=history[history.length-1];setHistory(h=>h.slice(0,-1));navigate(prev,true);}}>← Back</button><button onClick={()=>openInBrowser(browserUrlForTitle(item.name))}>View wiki ↗</button></div><div className={`item-title ${isDefenseItem(item)?'defense-item':''}`}><Icon item={item} large/><div><div className="eyebrow">{catalog.categories[item.type]??item.type}</div><h2>{item.name}</h2></div><button className={`favorite ${favorites.includes(item.id)?'saved':''}`} aria-label={favorites.includes(item.id)?'Remove favorite':'Add favorite'} onClick={favorite}>{favorites.includes(item.id)?'★':'☆'}</button></div><p className="description">{item.description}</p><div className="facts"><span>STACK SIZE <b>{item.stack_size}</b></span><span>RECIPES <b>{recipes.length}</b></span><span>{item.energy?'FUEL ENERGY':'REPLICATOR'} <b>{item.energy?`${(item.energy/1e6).toLocaleString()} MJ`:recipe?.handcraft?'Available':'Not available'}</b></span></div>
+ <div className="tabs"><button className={tab==='recipe'?'active':''} onClick={()=>setTab('recipe')}>Crafting recipe</button><button className={tab==='chain'?'active':''} onClick={()=>setTab('chain')}>Production chain</button></div>
+ {recipe?<><div className="recipe-controls">{recipes.length > 1 && <label>RECIPE<select className={isDefenseItem(item)?'defense-item':''} aria-label="Recipe" value={recipe.id} onChange={e=>setRecipeId(Number(e.target.value))}>{recipes.map(r=><option value={r.id} key={r.id}>{r.name.replace(/^ - /,'')}{r.explicit?' · alternate':''}</option>)}</select></label>}<label>TARGET QUANTITY<input type="number" aria-label="Target quantity" min="1" max="1000000" value={quantity} onChange={e=>setQuantity(Math.min(1000000,Math.max(1,Math.floor(Number(e.target.value)||1))))}/></label></div>
+ {tab==='recipe'?<><div className="recipe-box"><div className="section-label">REQUIRED INPUTS <span>{batches} crafting batch{batches===1?'':'es'}</span></div><p className="input-hint">Click an input to expand its recipe.</p><div className="ingredients" key={recipe.id}>{pairs(recipe.inputs).map(p=><ExpandableInput key={p.id} catalog={catalog} itemMap={itemMap} id={p.id} count={p.count*batches} path={[selected]}/>)}</div><div className="conversion"><span>↓</span><span>{recipe.seconds}s per batch · {(recipe.seconds*batches).toLocaleString()}s total base time</span></div><div className="section-label">OUTPUTS <span>{recipe.type==='FRACTIONATE'?'Expected yields · probabilistic':'Includes any byproducts'}</span></div><div className="ingredients outputs">{pairs(recipe.outputs).map(p=>chip(p.id,p.count*batches))}</div></div><div className="recipe-meta"><div><span className="section-label">MADE IN</span><div className="facility-links">{(catalog.facilities[recipe.type]?.buildings??[]).map(id=>chip(id))}</div>{!catalog.facilities[recipe.type]?.buildings.length&&<p>{catalog.facilities[recipe.type]?.name??recipe.type}</p>}</div><div><span className="section-label">UNLOCKED BY</span><p>{catalog.techs.filter(t=>t.recipes?.includes(recipe.id)).map(t=>t.name).join(', ')||'Starting recipe / no technology listed'}</p></div></div><p className="note">{recipe.type==='FRACTIONATE'?'Fractionation has a 1% conversion chance. Quantities and processing times are statistical averages, not guaranteed yields.':'Whole batches are rounded up to meet your target. Times use base recipe speed, before machine speed and proliferator bonuses.'}</p></>:<div className="chain"><p className="note">Click a branch to expand. Ingredients use their first listed recipe; alternate choices apply to the selected item only. Byproducts are shown in recipes, but are not reused across branches. Fractionation quantities are expected averages.</p>{tree(item.id,quantity,[])}</div>}</>:<div className="resource-card"><span>◇</span><h3>Gathered, not crafted</h3><p>{item.mining_from??item.explicit_produce_from??'No crafting recipe is listed in the wiki snapshot. This item is obtained through gameplay.'}</p></div>}
+ <section className="used-in"><div className="section-label">USED TO BUILD <span>{uses.length} recipes</span></div><div className="used-grid">{Array.from(new Set(uses.flatMap(r=>pairs(r.outputs).map(p=>p.id)))).map(id=>chip(id))}</div>{!uses.length&&<p className="note">No further crafting recipes use this item.</p>}</section><div className="snapshot">Local snapshot · {new Date(catalog.downloaded).toLocaleDateString()} · Wiki revision {catalog.revision}</div></section>}
+ </div>}</main></div>;
 }
