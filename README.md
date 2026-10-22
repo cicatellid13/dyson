@@ -69,11 +69,11 @@ Download `scripts/install-windows.ps1` to a Windows 11 x64 or ARM64 PC and run i
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$HOME\Downloads\install-windows.ps1"
 ```
 
-The execution policy override applies only to that process. The script downloads checksum-verified Node.js 22 build tools, obtains the private repository via GitHub login when needed, installs locked dependencies, runs checks, builds an NSIS installer, and installs DSP Fieldguide for your Windows account. No system-wide Node.js or Git installation is required. Internet is required for setup; the installed app works offline. GitHub authentication may require your browser.
+The execution policy override applies only to that process. The script downloads checksum-verified Node.js 22 build tools, obtains the private repository via GitHub login when needed, installs locked dependencies, runs checks, builds an NSIS installer, and installs DSP Fieldguide for your Windows account. No system-wide Node.js or Git installation is required. Internet is required for setup and the first MongoDB connection; subsequent launches can use the offline cache. GitHub authentication may require your browser.
 
 Alternatively, download and extract the repository ZIP from GitHub while signed in, then run the script from its `scripts` folder. It uses the adjacent source and skips GitHub CLI setup/login.
 
-Setup logs and build tools are retained under `%LOCALAPPDATA%\DSP-Fieldguide-Setup` for troubleshooting. The Windows installer is unsigned; Windows may show an app reputation prompt. Windows execution has not yet been validated on a Windows host. Mac favorites and planet notes do not automatically transfer.
+Setup logs and build tools are retained under `%LOCALAPPDATA%\DSP-Fieldguide-Setup` for troubleshooting. The Windows installer is unsigned; Windows may show an app reputation prompt. Windows installer packaging and tests are validated in GitHub Actions. Interactive installation on a separate Windows PC has not been tested here. Mac systems, planets, notes and favorites load automatically from the same MongoDB database.
 
 
 ## MongoDB configuration and sync
@@ -89,3 +89,19 @@ Use the fields from `.env.example`. The Windows setup script asks for the URI us
 Edits save locally immediately and sync after a 750 ms pause. A shared workspace document allows an atomic revision check; only changed sections or settings are written. Independent changes merge, while conflicting edits show a choice and retain a backup. The app checks other devices every 30 seconds and when focused. Offline edits retry automatically. Initial connection requires network access; subsequent launches use the cache. Local recovery files live beside the installed app’s `.env`.
 
 Catalog seeding is intentionally idempotent. A new wiki snapshot requires an explicit backend catalog migration; `data:refresh` alone does not overwrite the shared catalog. Images remain bundled with the app.
+
+
+### Windows installation from the repository ZIP
+
+1. Sign into GitHub with the account that can access this private repository, then download the `main` branch ZIP to Downloads as `dyson-main.zip`.
+2. Open Windows PowerShell and run:
+
+```powershell
+$sourceFolder = Join-Path $HOME 'Downloads\DSP-Fieldguide-Source'
+Expand-Archive -LiteralPath "$HOME\Downloads\dyson-main.zip" -DestinationPath $sourceFolder -Force
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$sourceFolder\dyson-main\scripts\install-windows.ps1"
+```
+
+3. When prompted, paste the same MongoDB connection string used on your Mac and press Enter. Input is hidden. The script creates the private `.env` for your Windows account.
+4. Open DSP Fieldguide from Start. Wait for **Cloud synced**, then open **Logistics Network**; your existing Sadira system and planets should appear. No local MongoDB server, Node.js or Git installation is required beforehand.
+5. If cloud access fails, ensure Atlas Network Access allows this Windows machine's public IP, then reopen the app. If installation fails, use the setup log path printed by the script. Keep the window open until setup completes.
