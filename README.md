@@ -8,19 +8,19 @@ An offline desktop item and recipe reference for Dyson Sphere Program, for macOS
 - Alternate recipes, unlock technology, crafting time, and quantity scaling
 - Expandable production chains with cycle protection
 - Persistent favorites
-- Logistics Network: systems with nested planets, notes, import/export routes, and per-planet filters. Data saves automatically on this device.
+- Logistics Network: systems with nested planets, notes, import/export routes, and per-planet filters. Data saves locally and syncs across machines through MongoDB.
 - Dark Fog toggle hides combat content throughout the app or restores it in full color.
 
 ## Run
 
-Node.js 20+ required (22 recommended).
+Node.js 22 recommended. Copy `.env.example` to `.env` and supply your MongoDB URI before launching.
 
 ```sh
 npm install
 npm run dev
 ```
 
-Uses a dedicated development port, 5199. Electron opens the correct Vite server. No internet is needed after dependencies are installed: the catalog and images ship with the app.
+Uses a dedicated development port, 5199. Electron opens the correct Vite server. First setup requires MongoDB access. After initialization, the catalog, images and workspace are cached for offline use.
 
 ## Package
 
@@ -29,7 +29,7 @@ npm run build:dir # unpacked native application in release/
 npm run build     # macOS DMG/ZIP or Windows NSIS installer
 ```
 
-Build on the target operating system. macOS builds are unsigned for local use; public distribution requires signing/notarization. Windows packaging is configured but needs validation on Windows.
+Build on the target operating system. macOS builds are unsigned for local use; public distribution requires signing/notarization. Windows installer packaging is checked by the repository’s Windows workflow.
 
 ## Data and updates
 
@@ -74,3 +74,18 @@ The execution policy override applies only to that process. The script downloads
 Alternatively, download and extract the repository ZIP from GitHub while signed in, then run the script from its `scripts` folder. It uses the adjacent source and skips GitHub CLI setup/login.
 
 Setup logs and build tools are retained under `%LOCALAPPDATA%\DSP-Fieldguide-Setup` for troubleshooting. The Windows installer is unsigned; Windows may show an app reputation prompt. Windows execution has not yet been validated on a Windows host. Mac favorites and planet notes do not automatically transfer.
+
+
+## MongoDB configuration and sync
+
+The Electron backend creates `dsp_fieldguide.wiki_catalog` and `dsp_fieldguide.workspace` automatically. `npm run db:seed` seeds the bundled catalog without replacing an existing snapshot or your workspace. The first connected desktop launch migrates that app profile’s existing planets, systems and favorites if no shared workspace exists; later devices use the shared workspace. A local legacy backup is retained.
+
+Development reads the project `.env`. Installed apps read:
+- macOS: `~/Library/Application Support/dsp-wiki-desktop/.env`
+- Windows: `%APPDATA%\dsp-wiki-desktop\.env`
+
+Use the fields from `.env.example`. The Windows setup script asks for the URI using hidden input and creates the file for you. Configure the same database on each computer; its IP must be permitted by your Atlas network settings. Real credentials are ignored by Git and excluded from installers. Database access stays inside the Electron backend; this is a trusted, single-user desktop deployment.
+
+Edits save locally immediately and sync after a 750 ms pause. A shared workspace document allows an atomic revision check; only changed sections or settings are written. Independent changes merge, while conflicting edits show a choice and retain a backup. The app checks other devices every 30 seconds and when focused. Offline edits retry automatically. Initial connection requires network access; subsequent launches use the cache. Local recovery files live beside the installed app’s `.env`.
+
+Catalog seeding is intentionally idempotent. A new wiki snapshot requires an explicit backend catalog migration; `data:refresh` alone does not overwrite the shared catalog. Images remain bundled with the app.

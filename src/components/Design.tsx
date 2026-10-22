@@ -1,14 +1,11 @@
+import { useWorkspace, updateWorkspace } from '../lib/persistence';
 import { useMemo, useState } from 'react';
 import { isDefenseItem, type Catalog, type Item } from '../lib/catalog';
-import { DESIGN_KEY, createSection, emptyDesign, parseDesign, removeSection, type DesignData, type DesignSection, type TradeEntry } from '../lib/design';
+import { createSection, removeSection, type DesignData, type DesignSection, type TradeEntry } from '../lib/design';
 import '../styles/design.css';
 import { PlanetPicker } from './PlanetPicker';
 import { ItemPicker } from './ItemPicker';
 
-function loadDesign() {
-  try { return { data: parseDesign(localStorage.getItem(DESIGN_KEY)), error: '' }; }
-  catch { return { data: emptyDesign(), error: 'Your saved designs could not be read. They have been left untouched. Reopen the app to retry.' }; }
-}
 function TradeList({ direction, entries, items, sections, onChange }: {
   direction: 'imports' | 'exports'; entries: TradeEntry[]; items: Item[]; sections: DesignSection[]; onChange: (entries: TradeEntry[]) => void;
 }) {
@@ -108,9 +105,10 @@ function PlanetCard({ planet, items, onOpen }: { planet: DesignSection; items: M
 
 export function Design({ catalog }: { catalog: Catalog }) {
   const itemLookup = useMemo(() => new Map(catalog.items.map(item => [item.id, item])), [catalog.items]);
-  const [initial] = useState(loadDesign);
-  const [data, setData] = useState(initial.data);
-  const [saveError, setSaveError] = useState(initial.error);
+  const cloud = useWorkspace();
+  const data = cloud.view.data.design;
+  const saveError = cloud.error;
+  const initial = { data, error: '' };
   const [activeId, setActiveId] = useState<string | null>(initial.data.sections[0]?.id ?? null);
   const [creation, setCreation] = useState<{kind: DesignSection['kind']; parentId: string | null; placement: 'sidebar' | 'inline'} | null>(null);
   const [name, setName] = useState('');
@@ -124,10 +122,8 @@ export function Design({ catalog }: { catalog: Catalog }) {
   const roots = data.sections.filter(s => s.kind === 'system');
   const unassigned = data.sections.filter(s => s.kind === 'planet' && s.parentId === null);
   function commit(next: DesignData) {
-    setData(next);
+    updateWorkspace(current => ({...current, design: next}));
     setUndo(null);
-    try { localStorage.setItem(DESIGN_KEY, JSON.stringify(next)); setSaveError(''); }
-    catch { setSaveError('Changes are only in memory: this device could not save them. Keep this page open and retry saving.'); }
   }
   function patch(changes: Partial<DesignSection>) {
     commit({ ...data, sections: data.sections.map(s => s.id === activeId ? { ...s, ...changes } : s) });
@@ -146,8 +142,8 @@ export function Design({ catalog }: { catalog: Catalog }) {
   function confirmRemove() {
     if (!deleteId) return;
     const removed = data.sections.find(s => s.id === deleteId);
-    const previous = { data, activeId };
     const next = removeSection(data, deleteId);
+    const previous = { data: { ...data, sections: data.sections.filter(s => !next.sections.some(kept => kept.id === s.id)) }, activeId };
     commit(next); setUndo(previous); setActiveId(removed?.parentId ?? next.sections[0]?.id ?? null); setDeleteId(null);
   }
   function sectionButton(section: DesignSection, nested = false) {
@@ -167,9 +163,9 @@ export function Design({ catalog }: { catalog: Catalog }) {
     </aside>
     <section className="design-editor">
       {saveError && <div role="alert" className="design-error">{saveError}{!initial.error && <button className="design-button" onClick={() => commit(data)}>Retry saving</button>}</div>}
-      {undo && <div className="design-undo">Section removed.<button onClick={() => { commit(undo.data); setActiveId(undo.activeId); setUndo(null); }}>Undo</button><button aria-label="Dismiss undo" onClick={() => setUndo(null)}>×</button></div>}
+      {undo && <div className="design-undo">Section removed.<button onClick={() => { const restored = [...data.sections, ...undo.data.sections.filter(s => !data.sections.some(current => current.id === s.id))]; commit({ ...data, sections: restored.filter(s => !s.parentId || restored.some(parent => parent.id === s.parentId)) }); setActiveId(undo.activeId); setUndo(null); }}>Undo</button><button aria-label="Dismiss undo" onClick={() => setUndo(null)}>×</button></div>}
       {active ? <div key={active.id}>
-        <div className="design-editor-top"><div className="eyebrow">{parent ? <><button onClick={() => navigate(parent.id)}>{parent.name || 'Unnamed system'}</button> / PLANET</> : active.kind === 'system' ? 'STAR SYSTEM' : 'PLANET'}</div><span className="design-save-status" role="status">{saveError ? 'Not saved' : 'Saved on this device'}</span></div>
+        <div className="design-editor-top"><div className="eyebrow">{parent ? <><button onClick={() => navigate(parent.id)}>{parent.name || 'Unnamed system'}</button> / PLANET</> : active.kind === 'system' ? 'STAR SYSTEM' : 'PLANET'}</div><span className="design-save-status" role="status">{saveError ? 'Not saved' : cloud.view.status === 'synced' ? 'Synced to cloud' : cloud.view.status === 'conflict' ? 'Sync conflict' : 'Saved locally · syncing'}</span></div>
         <label className="design-name">Name<input aria-label="Section name" value={active.name} maxLength={120} onChange={e => patch({name: e.target.value})} onBlur={() => { if (!active.name.trim()) patch({name: active.kind === 'planet' ? 'Untitled planet' : 'Untitled system'}); }}/></label>
         {active.kind === 'planet' && !parent && <div className="design-assignment"><label>Assign to a system<select aria-label="Assign planet to system" value="" onChange={event => { if (roots.some(system => system.id === event.target.value)) patch({parentId: event.target.value}); }}><option value="">Select a system</option>{roots.map(system => <option key={system.id} value={system.id}>{system.name}</option>)}</select></label>{!roots.length && <p className="design-empty-small">Create a system using + System, then assign this planet here. Your notes and routes are preserved.</p>}</div>}
         {active.kind === 'system' && <section className="design-planets"><div className="design-section-heading"><h3>Planets in this system</h3><button className="design-button" onClick={() => begin('planet', active.id)}>+ Add planet</button></div>{creation?.kind === 'planet' && creation.placement === 'inline' && creation.parentId === active.id && <form className="design-create-form design-inline-create" onSubmit={add}><h3>Add planet to {active.name}</h3><label>Planet name<input autoFocus aria-label="New planet name" value={name} maxLength={120} placeholder="e.g. Homeworld" onChange={event => setName(event.target.value)}/></label><div><button className="design-button" type="submit" disabled={!name.trim()}>Create planet</button><button type="button" onClick={() => setCreation(null)}>Cancel</button></div></form>}<div className="design-planet-cards">{children.map(child => <PlanetCard key={`${child.id}-${catalog.items.length}`} planet={child} items={itemLookup} onOpen={() => navigate(child.id)}/>)}</div>{!children.length && <p className="design-empty-small">Add a planet to start mapping this system.</p>}</section>}

@@ -47,3 +47,5 @@
 .dark-fog-normal .defense-item :is(strong,b,h2,small,.eyebrow,.chevron,.row-arrow) { color: inherit; }
 .dark-fog-normal .item-row.defense-item.selected { background: #22362d; border-color: #496b54; }
 .dark-fog-normal .planet-trade-row.defense-item { color: #cfddd6; }
+.sync-banner { padding: 10px 20px; background: #293b32; color: #d8e9df; font-size: 12px; }
+.sync-banner button,.error button { margin-left: 12px; text-decoration: underline; }

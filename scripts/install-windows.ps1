@@ -101,12 +101,33 @@ try {
     Run-Checked $npm @('run', 'build', '--', '--win', "--$nodeArch", '--publish', 'never')
     $installer = Join-Path $source 'release\DSP-Fieldguide-Setup.exe'
     if (-not (Test-Path $installer)) { throw 'The build completed but the installer was not found.' }
+    $configDir = Join-Path $env:APPDATA 'dsp-wiki-desktop'
+    New-Item -ItemType Directory -Path $configDir -Force | Out-Null
+    $configPath = Join-Path $configDir '.env'
+    if (-not (Test-Path $configPath)) {
+        # Secure input is not echoed or written to the setup transcript.
+        $secureUri = Read-Host 'Paste your MongoDB connection string (hidden)' -AsSecureString
+        $uriPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureUri)
+        try {
+            $mongoUri = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($uriPointer)
+            if ($mongoUri -notmatch '^mongodb(\+srv)?://' -or $mongoUri -match '[\r\n]') { throw 'A valid single-line MongoDB connection string is required.' }
+            [IO.File]::WriteAllText($configPath, "MONGODB_URI=$mongoUri`nMONGODB_DATABASE=dsp_fieldguide`n", (New-Object Text.UTF8Encoding($false)))
+            $acl = Get-Acl $configPath
+            $acl.SetAccessRuleProtection($true, $false)
+            $rule = New-Object Security.AccessControl.FileSystemAccessRule([Security.Principal.WindowsIdentity]::GetCurrent().Name, 'FullControl', 'Allow')
+            $acl.SetAccessRule($rule)
+            Set-Acl -Path $configPath -AclObject $acl
+        } finally {
+            [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($uriPointer)
+            $mongoUri = $null; $secureUri = $null
+        }
+    }
     Write-Host 'Installing DSP Fieldguide for your Windows account...'
     $installProcess = Start-Process -FilePath $installer -ArgumentList '/S' -Wait -PassThru
     if ($installProcess.ExitCode -ne 0) { throw "Installer failed (exit $($installProcess.ExitCode))." }
     Write-Host 'Installed! Open DSP Fieldguide from the Start menu.'
     Write-Host "Installer: $installer"
-    Write-Host 'Your saved planets and favorites remain on this Windows device.'
+    Write-Host 'Planets, systems and favorites sync through MongoDB. Offline changes are cached on this device.'
 } catch {
     Write-Host "Setup failed: $($_.Exception.Message)" -ForegroundColor Red
     Write-Host "Log and build files: $workRoot"

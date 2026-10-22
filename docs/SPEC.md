@@ -91,3 +91,12 @@ Import/export item pickers use custom dark menus with item names on the left and
 - Off excludes combat-only items and Dark Fog category items from the catalog view, favorites, counts, item details, recipes, production chains, facility links, and every logistics list and picker. Recipes requiring excluded items are omitted rather than showing incomplete ingredients.
 - On restores items in full color and normal alphabetical order. All items and Favorites counts reflect visible items.
 - Hidden favorites and saved logistics entries are preserved. Editing visible logistics entries must not delete hidden entries. Turning off clears hidden item selection/history and transient logistics searches.
+
+## Shared MongoDB workspace (supersedes device-only persistence)
+- Database `dsp_fieldguide` is isolated from other databases on the supplied cluster. The backend creates `wiki_catalog` and `workspace` programmatically; their built-in unique `_id` indexes identify the catalog and shared workspace.
+- Only Electron main-process backend modules load `.env` or import the MongoDB driver. Renderer IPC is restricted to the app's main frame and validates workspace payloads. Credentials never enter the renderer, repository, logs, or packaged assets.
+- First connected launch seeds an immutable catalog snapshot and migrates existing local data only if the shared workspace does not exist. Preserve a separate legacy backup. Subsequent devices load the existing shared workspace. First setup requires MongoDB access; later launches and edits work from the local cache while offline.
+- Persist edits to an atomic local recovery file, debounce cloud writes for 750 ms, and update only changed sections/settings in one atomic workspace document. Reuse a small connection pool. Check for remote changes every 30 seconds and on focus; no writes when unchanged.
+- Revision compare-and-swap prevents lost updates. Three-way merge combines independent edits, including favorite membership. Conflicting notes, lists, or edit/delete operations require an explicit local/cloud choice and preserve a recovery backup.
+- Keep a renderer recovery outbox until backend acknowledgment; recover pending changes on restart. Surface pending, synced, offline, conflict, and save failures accurately.
+- Test independent merges, conflicts, deletion, minimal patches, revision retries, offline restart recovery and explicit conflict resolution. Confirm live catalog seeding and workspace migration without modifying unrelated cluster data.

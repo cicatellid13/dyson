@@ -1,3 +1,4 @@
+import { initializePersistence, useWorkspace, updateWorkspace, resolveWorkspace, retrySync } from './lib/persistence';
 import { CategoryIcon } from './components/CategoryIcon';
 import { useEffect, useMemo, useState } from 'react';
 import { batchesFor, pairs, recipesFor, isDefenseItem, catalogForDarkFog, type Catalog, type Item } from './lib/catalog';
@@ -46,23 +47,25 @@ function ExpandableInput({ catalog, itemMap, id, count, path }: {
     </div>}
   </div>;
 }
-function readFavorites():number[] { try { const data=JSON.parse(localStorage.getItem('dsp-favorites')??'[]'); return Array.isArray(data)?data.filter(x=>typeof x==='number'):[]; } catch {return [];} }
 
 export function App(){
 
- const [error,setError]=useState('');
+
  const [query,setQuery]=useState('');
  const [category,setCategory]=useState('All items');
- const [darkFog,setDarkFog]=useState(()=>{try{return localStorage.getItem('dsp-dark-fog')==='true';}catch{return false;}});
+ const cloud=useWorkspace();
+ const error=cloud.error;
+ useEffect(()=>{void initializePersistence();},[]);
+ const darkFog=cloud.view.data.darkFog;
+ const favorites=cloud.view.data.favorites;
  function toggleDarkFog(){
-  const next=!darkFog;setDarkFog(next);
+  const next=!darkFog;
   if(!next&&['Turrets','Defense','Dark Fog'].includes(category))setCategory('All items');
-  try{localStorage.setItem('dsp-dark-fog',String(next));}catch{setError('Your Dark Fog preference could not be saved on this device.');}
+  updateWorkspace(data=>({...data,darkFog:next}));
  }
- const catalog=useMemo(()=>catalogForDarkFog(snapshot as unknown as Catalog,darkFog),[darkFog]);
+ const catalog=useMemo(()=>catalogForDarkFog(cloud.catalog ?? snapshot as unknown as Catalog,darkFog),[cloud.catalog,darkFog]);
  const [selected,setSelected]=useState(1303);
  const [history,setHistory]=useState<number[]>([]);
- const [favorites,setFavorites]=useState(readFavorites);
  const [recipeId,setRecipeId]=useState<number|null>(null);
  const [quantity,setQuantity]=useState(1);
  const [tab,setTab]=useState<'recipe'|'chain'>('recipe');
@@ -77,7 +80,7 @@ export function App(){
  const recipe=recipes.find(r=>r.id===recipeId)??recipes[0];
  const batches=recipe?batchesFor(recipe,selected,quantity):0;
  function navigate(id:number,back=false){ if(!itemMap.has(id))return; if(!back&&id!==selected)setHistory(h=>[...h,selected]);setSelected(id);setRecipeId(null);setQuantity(1); }
- function favorite(){const next=favorites.includes(selected)?favorites.filter(i=>i!==selected):[...favorites,selected];setFavorites(next);try{localStorage.setItem('dsp-favorites',JSON.stringify(next));}catch{setError('Your favorites could not be saved on this device.');}}
+ function favorite(){updateWorkspace(data=>({...data,favorites:data.favorites.includes(selected)?data.favorites.filter(id=>id!==selected):[...data.favorites,selected]}));}
  const categories=['All items','Favorites','Logistics Network','Buildings',...Object.values(catalog?.categories??{}).filter(c=>c!=='Unknown Category'&&(darkFog||!['Turrets','Defense','Dark Fog'].includes(c)))];
  const searchPlaceholders:Record<string,string>={
   'All items':'Find an item or building…',
@@ -105,14 +108,15 @@ export function App(){
   const b=batchesFor(r,id,count);
   return <details className="tree-node" open={depth<2} key={`${id}-${depth}`}><summary className={isDefenseItem(target)?'defense-item':''}><Icon item={target}/><strong>{target?.name}</strong><span>× {count.toLocaleString()}</span><small>{b} batch{b!==1?'es':''} · {r.seconds*b}s</small></summary><div>{pairs(r.inputs).map(p=><div key={p.id}>{tree(p.id,p.count*b,[...path,id],depth+1)}</div>)}</div></details>;
  }
- if(!catalog)return <div className="boot"><div className="brand-orbit">◉</div><h1>DSP Fieldguide</h1><p>{error||'Opening your local item library…'}</p>{error&&<button onClick={()=>location.reload()}>Try again</button>}</div>;
+ if(!cloud.ready)return <div className="boot"><h1>DSP Fieldguide</h1><p>{cloud.error || 'Opening your shared workspace…'}</p>{cloud.error && <button onClick={()=>{void initializePersistence();}}>Retry connection</button>}</div>;
  return <div className="app-shell dark-fog-normal">
- <aside className="sidebar"><div className="brand"><span className="brand-orbit">◉</span><div><strong>FIELDGUIDE</strong><small>DYSON SPHERE PROGRAM</small></div></div><div className="nav-caption">YOUR LIBRARY</div><nav aria-label="Item categories">{categories.filter(c=>['All items','Favorites','Logistics Network','Buildings'].includes(c)||catalog.items.some(i=>catalog.categories[i.type]===c)).map((c,index)=><button className={category===c?'nav active':'nav'} key={c} onClick={()=>setCategory(c)}><span>{index===0?'▦':index===1?'☆':c==='Logistics Network'?'✧':c==='Buildings'?'▤':<CategoryIcon category={c}/>}</span>{c}<small>{c==='All items'?catalog.items.length:c==='Favorites'?favorites.filter(id=>itemMap.has(id)).length:''}</small></button>)}</nav><div className="offline"><span className="status-dot"/> Available offline<small>Catalog & images stored on this device</small></div><footer>Data from DSP Wiki contributors.<br/><a href="https://www.fandom.com/licensing" onClick={e=>{e.preventDefault();openInBrowser(e.currentTarget.href);}}>Content attribution & licensing ↗</a></footer><button type="button" className="dark-fog-toggle" role="switch" aria-checked={darkFog} onClick={toggleDarkFog}><span className="dark-fog-switch" aria-hidden="true"/><span>Dark Fog</span></button></aside>
- <main className="workspace"><header className="topbar"><span>FACTORY REFERENCE <span className="slash">/</span> {category==='Logistics Network'?'LOGISTICS NETWORK':'ITEM LIBRARY'}</span><span className="edition">LOCAL EDITION <span className="status-dot"/></span></header><section className="sphere-header" aria-label="Dysons Sphere">
+ <aside className="sidebar"><div className="brand"><span className="brand-orbit">◉</span><div><strong>FIELDGUIDE</strong><small>DYSON SPHERE PROGRAM</small></div></div><div className="nav-caption">YOUR LIBRARY</div><nav aria-label="Item categories">{categories.filter(c=>['All items','Favorites','Logistics Network','Buildings'].includes(c)||catalog.items.some(i=>catalog.categories[i.type]===c)).map((c,index)=><button className={category===c?'nav active':'nav'} key={c} onClick={()=>setCategory(c)}><span>{index===0?'▦':index===1?'☆':c==='Logistics Network'?'✧':c==='Buildings'?'▤':<CategoryIcon category={c}/>}</span>{c}<small>{c==='All items'?catalog.items.length:c==='Favorites'?favorites.filter(id=>itemMap.has(id)).length:''}</small></button>)}</nav><div className="offline"><span className="status-dot"/> {cloud.view.status==='synced'?'Cloud synced':cloud.view.status==='pending'?'Saving changes…':cloud.view.status==='conflict'?'Sync conflict':'Offline · saved locally'}<small>Catalog & images cached on this device</small></div><footer>Data from DSP Wiki contributors.<br/><a href="https://www.fandom.com/licensing" onClick={e=>{e.preventDefault();openInBrowser(e.currentTarget.href);}}>Content attribution & licensing ↗</a></footer><button type="button" className="dark-fog-toggle" role="switch" aria-checked={darkFog} onClick={toggleDarkFog}><span className="dark-fog-switch" aria-hidden="true"/><span>Dark Fog</span></button></aside>
+ <main className="workspace"><header className="topbar"><span>FACTORY REFERENCE <span className="slash">/</span> {category==='Logistics Network'?'LOGISTICS NETWORK':'ITEM LIBRARY'}</span></header><section className="sphere-header" aria-label="Dysons Sphere">
    <img className="sphere-galaxy" src={`${import.meta.env.BASE_URL}art/galaxy-header.png`} alt="Panoramic galaxy surrounding a brilliant golden star with orbital collectors for a Dyson sphere"/>
    <div className="sphere-title"><span className="twinkling-star" aria-hidden="true">✦</span><h1>Dysons Sphere</h1></div>
  </section>
- {error&&<div className="error" role="alert">{error}</div>}
+ {error&&<div className="error" role="alert">{error}<button onClick={()=>updateWorkspace(data=>data)}>Retry saving</button></div>}
+ {cloud.view.message && <div className="sync-banner" role="status">{cloud.view.message}{cloud.view.status==='conflict'?<><button onClick={()=>{void resolveWorkspace('cloud');}}>Use cloud version</button><button onClick={()=>{void resolveWorkspace('local');}}>Keep this device’s version</button></>:<button onClick={()=>{void retrySync();}}>Retry sync</button>}</div>}
  {category==='Logistics Network'?<Design catalog={catalog}/>:<div className="browser-layout"><section className="catalog-panel"><div className="catalog-tools"><label className="search"><span>⌕</span><input type="search" aria-label={`Search ${category.toLowerCase()}`} placeholder={searchPlaceholder} value={query} onChange={e=>setQuery(e.target.value)}/><kbd>⌕</kbd></label><div className="list-heading"><h2>{category}</h2><span>{visible.length} items</span></div></div><div className="item-list">{visible.map(i=><button key={i.id} className={`item-row ${selected===i.id?'selected':''} ${isDefenseItem(i)?'defense-item':''}`} onClick={()=>navigate(i.id)}><Icon item={i}/><span><strong>{i.name}</strong><small>{catalog.categories[i.type]??i.type}</small></span><span className="row-arrow">{favorites.includes(i.id)?'★':'›'}</span></button>)}{!visible.length&&<div className="empty"><h3>No items here yet</h3><p>{category==='Favorites'?'Star an item to keep it close.':'Try a different name or category.'}</p><button onClick={()=>{setQuery('');setCategory('All items');}}>Show all items</button></div>}</div></section>
  {item&&<section className="detail-panel" key={item.id}><div className="detail-actions"><button disabled={!history.length} onClick={()=>{const prev=history[history.length-1];setHistory(h=>h.slice(0,-1));navigate(prev,true);}}>← Back</button><button onClick={()=>openInBrowser(browserUrlForTitle(item.name))}>View wiki ↗</button></div><div className={`item-title ${isDefenseItem(item)?'defense-item':''}`}><Icon item={item} large/><div><div className="eyebrow">{catalog.categories[item.type]??item.type}</div><h2>{item.name}</h2></div><button className={`favorite ${favorites.includes(item.id)?'saved':''}`} aria-label={favorites.includes(item.id)?'Remove favorite':'Add favorite'} onClick={favorite}>{favorites.includes(item.id)?'★':'☆'}</button></div><p className="description">{item.description}</p><div className="facts"><span>STACK SIZE <b>{item.stack_size}</b></span><span>RECIPES <b>{recipes.length}</b></span><span>{item.energy?'FUEL ENERGY':'REPLICATOR'} <b>{item.energy?`${(item.energy/1e6).toLocaleString()} MJ`:recipe?.handcraft?'Available':'Not available'}</b></span></div>
  <div className="tabs"><button className={tab==='recipe'?'active':''} onClick={()=>setTab('recipe')}>Crafting recipe</button><button className={tab==='chain'?'active':''} onClick={()=>setTab('chain')}>Production chain</button></div>

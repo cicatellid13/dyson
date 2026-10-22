@@ -11,10 +11,13 @@
     "build:dir": "npm run typecheck && npm test && vite build && electron-builder --dir",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit",
-    "test": "node --test scripts/catalog.test.mjs scripts/design.test.mjs",
-    "data:refresh": "python3 scripts/import-wiki.py"
+    "test": "node --test scripts/catalog.test.mjs scripts/design.test.mjs && tsx --test scripts/persistence.test.ts",
+    "data:refresh": "python3 scripts/import-wiki.py",
+    "db:seed": "tsx scripts/seed-database.ts"
   },
   "dependencies": {
+    "dotenv": "^18.0.8",
+    "mongodb": "^6.21.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
@@ -24,6 +27,7 @@
     "@vitejs/plugin-react": "^4.3.3",
     "electron": "^33.2.0",
     "electron-builder": "^25.1.8",
+    "tsx": "^4.23.15",
     "typescript": "^5.6.3",
     "vite": "^5.4.10",
     "vite-plugin-electron": "^0.28.8",
