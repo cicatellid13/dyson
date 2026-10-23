@@ -134,3 +134,8 @@ Import/export item pickers use custom dark menus with item names on the left and
 - Systems start collapsed with a disclosure arrow; clicking a system toggles its planets while opening the system editor. Creating a planet or opening it from a system card expands its parent.
 - Drag systems to reorder systems and planets to reorder siblings within the same system. Reordering never reparents a planet. Highlight valid drop targets and retain the current selection.
 - Store optional numeric order per section, preserve legacy order until changed, and use the same saved planet order for sidebar rows and system cards. Cloud round trips preserve order and merge independent notes edits.
+
+## Drag required inputs to Favorites
+- Required input rows, including nested expanded inputs, can be dragged to the Favorites navigation option or anywhere in its catalog pane while Favorites is selected. Preserve ordinary click-to-expand behavior.
+- Highlight both available destinations and the active drop target. Accept only known visible catalog items dragged from this app; ignore unrelated drag payloads. Add without toggling/removing existing favorites or creating duplicates, and show a brief confirmation.
+- Keep the current recipe selected. When dropping into an open Favorites pane, clear its search so the added item is visible. Persist through the existing shared favorites mechanism.
