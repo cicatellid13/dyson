@@ -151,3 +151,5 @@ Import/export item pickers use custom dark menus with item names on the left and
 - The sidebar visualize control sits inside the system name card at its right edge, with the exact tooltip `visualize`; it remains a separate button so opening the graph does not toggle the system disclosure.
 
 - Planet artwork uses muted, softly shaded spheres without striped textures, decorative rings or glow; selection uses a thin outline.
+
+- Visualize uses an immediate custom tooltip on hover and keyboard focus. Planet spheres are neutral charcoal with a faint highlight, without hue variation.
