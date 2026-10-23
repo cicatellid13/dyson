@@ -13,7 +13,7 @@
 
 /* Local orbital artwork and a gently twinkling title star. */
 .sphere-header { position: relative; flex-shrink: 0; height: 174px; overflow: hidden; isolation: isolate; background: #070f15; }
-.sphere-galaxy { position: absolute; right: 0; top: -17.5%; width: auto; height: 135%; max-width: none; object-fit: contain; z-index: -2; }
+.sphere-galaxy { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; object-fit: cover; object-position: center; z-index: -2; }
 .sphere-header::after { content: ''; position: absolute; inset: 0; z-index: -1; background: linear-gradient(90deg, #091216e8 0%, #09121690 35%, transparent 68%), linear-gradient(0deg, #10171980, transparent 35%); }
 .sphere-title { height: 100%; display: flex; align-items: center; gap: 21px; padding: 24px 36px; }
 .sphere-title h1 { margin: 0; font-size: clamp(30px, 3.5vw, 48px); letter-spacing: -1.5px; font-weight: 500; color: #edf5f4; text-shadow: 0 2px 24px #000; }

@@ -83,3 +83,20 @@ test('planet types survive validation and merge with independent edits',()=>{
  const local=copy(base), remote=copy(base);local.design.sections[1].planetType='Ocean';remote.design.sections[0].notes='System plan';
  const result=mergeWorkspace(base,local,remote);assert.equal(result.design.sections[1].planetType,'Ocean');assert.equal(result.design.sections[0].notes,'System plan');
 });
+
+test('planning order survives database encoding and merges with independent note edits', async () => {
+ const { ordered, reorderPlanning, nextScratchTitle } = await import('../src/lib/planning');
+ const { decode } = await import('../electron/backend/merge');
+ const base = fixture();
+ base.planning = { folders:[{id:'a',name:'A'},{id:'b',name:'B'}], notes:[{id:'one',folderId:'a',title:'scratch 1',body:''},{id:'two',folderId:'a',title:'scratch 2',body:''},{id:'three',folderId:'b',title:'Other',body:''}] };
+ const local=copy(base), remote=copy(base);
+ local.planning = reorderPlanning(reorderPlanning(local.planning,'folder','b','a'),'note','two','one');
+ remote.planning.notes[0].body = 'Independent edit';
+ const result = decode(encode(mergeWorkspace(base,local,remote)));
+ assert.deepEqual(ordered(result.planning.folders).map(f=>f.id),['b','a']);
+ assert.deepEqual(ordered(result.planning.notes.filter(n=>n.folderId==='a')).map(n=>n.id),['two','one']);
+ assert.equal(result.planning.notes.find(n=>n.id==='one')?.body,'Independent edit');
+ assert.deepEqual(reorderPlanning(base.planning,'note','one','three'),base.planning);
+ assert.equal(nextScratchTitle(base.planning.notes),'scratch 3');
+ assert.equal(nextScratchTitle([]),'scratch 1');
+});

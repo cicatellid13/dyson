@@ -121,3 +121,9 @@ Import/export item pickers use custom dark menus with item names on the left and
 - Install on normal app exit, after existing workspace shutdown persistence completes. Never force an active session to restart. Preserve app identity, userData, MongoDB configuration and recovery files.
 - Every successful main-branch Windows workflow produces version 1.1.<workflow run number>, builds/tests the installer, and stages installer, blockmap and latest.yml in a draft release before publishing atomically. Keep published versions immutable.
 - GitHub is a public download source only; no GitHub token or MongoDB credential is bundled. Existing installations need one manual upgrade to receive the updater.
+
+## Responsive banner and Planning navigation
+- Galaxy artwork covers the whole title section at every window width, cropping proportionally rather than leaving unused horizontal space.
+- Planning folders start collapsed and toggle their children with a disclosure arrow. Creating or moving a note into a folder expands that folder.
+- Rename Unfiled notes to Scratch pad. New scratch entries use scratch N, advancing beyond existing numbered titles; preserve existing titles.
+- Use outlined folder and document icons. Drag folder rows to reorder folders; drag notes to reorder within their current folder or Scratch pad. Highlight drop targets. Persist numeric ordering per record through validation, local recovery and MongoDB, keeping older records compatible and independent body edits mergeable.
