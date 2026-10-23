@@ -117,3 +117,13 @@ test('system and planet ordering preserves hierarchy and survives cloud encoding
  assert.deepEqual(reorderSections(base.design,'p1','p3'),base.design);
  assert.deepEqual(reorderSections(base.design,'sol','p1'),base.design);
 });
+
+test('logistics graph resolves direction, deduplicates mirrored cargo and excludes unavailable routes', async () => {
+ const {logisticsRoutes}=await import('../src/lib/logisticsGraph');
+ const base=fixture().design.sections[0];
+ const entry={id:'cargo',itemId:1001,amount:'',unit:'items' as const,destination:''};
+ const a={...base,id:'a',kind:'planet' as const,parentId:'sol',imports:[],exports:[{...entry,planetId:'b'},{...entry,id:'outside',planetId:'external'},{...entry,id:'hidden',itemId:999,planetId:'b'}]};
+ const b={...base,id:'b',kind:'planet' as const,parentId:'sol',imports:[{...entry,planetId:'a'}],exports:[]};
+ assert.deepEqual(logisticsRoutes([a,b],new Set([1001])),[{from:'a',to:'b',items:[1001]}]);
+ assert.deepEqual(logisticsRoutes([],new Set()),[]);
+});

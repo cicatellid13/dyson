@@ -141,3 +141,9 @@ Import/export item pickers use custom dark menus with item names on the left and
 - Keep the current recipe selected. When dropping into an open Favorites pane, clear its search so the added item is visible. Persist through the existing shared favorites mechanism.
 
 - Favorites rows show a small labeled remove icon on the right instead of a star. Removing saves immediately without changing the selected recipe; other catalog rows use their normal navigation chevron.
+
+## System logistics visualization
+- A visualize icon to the right of system names in the sidebar and system editor opens an optional map, with a Back to details action.
+- Planets appear as shaded spherical worlds over faint stars. Directed lines reflect explicitly assigned same-system routes, deduplicating matching import/export records. Missing, external, self and hidden-item routes are excluded.
+- Select a planet to open an adjacent bounded cargo panel with resource icons/names and the established blue import and green export arrows. All visible cargo remains listed, including unassigned/external entries. No inferred routing or editable graph state.
+- Empty systems explain how to start. Large systems scroll, labels remain readable, and buttons work with keyboard navigation.
