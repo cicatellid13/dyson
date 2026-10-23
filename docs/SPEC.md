@@ -111,3 +111,13 @@ Import/export item pickers use custom dark menus with item names on the left and
 - Planning is a top-level navigation section directly below Logistics Network. Users can create, rename and delete folders, create/edit/move/delete plain-text notes, and keep notes outside folders. Deletions require confirmation and offer undo. No Save button; use the existing recovery, debounce, conflict and cloud-sync mechanisms.
 - Planning data defaults to empty for old workspaces. Store notes/folders by ID in MongoDB and patch only changed records. Concurrent changes to separate notes merge; conflicting note bodies or folder deletion versus editing require resolution. Existing systems, planets, routes and favorites must survive migration.
 - Export validation behavior is unchanged (the user withdrew that request).
+
+## App version
+- Show a small, muted release version below the Dark Fog toggle at the bottom left. Read the version from package.json at build time so development and installed builds label their own release without a network request.
+
+## Windows automatic updates
+- Packaged Windows installations check public GitHub releases on startup and every four hours. Development and Mac builds do not run the Windows updater.
+- Download stable newer versions in the background; disallow prereleases/downgrades and concurrent downloads. Failed checks/downloads retry without interrupting workspace use.
+- Install on normal app exit, after existing workspace shutdown persistence completes. Never force an active session to restart. Preserve app identity, userData, MongoDB configuration and recovery files.
+- Every successful main-branch Windows workflow produces version 1.1.<workflow run number>, builds/tests the installer, and stages installer, blockmap and latest.yml in a draft release before publishing atomically. Keep published versions immutable.
+- GitHub is a public download source only; no GitHub token or MongoDB credential is bundled. Existing installations need one manual upgrade to receive the updater.

@@ -13,3 +13,5 @@ interface DspWikiBridge {
 interface Window {
   dspWiki?: DspWikiBridge;
 }
+
+declare const __APP_VERSION__: string;

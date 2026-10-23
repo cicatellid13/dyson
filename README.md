@@ -107,3 +107,13 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$sourceFolder\dyson-mai
 3. When prompted, paste the same MongoDB connection string used on your Mac and press Enter. Input is hidden. The script creates the private `.env` for your Windows account.
 4. Open DSP Fieldguide from Start. Wait for **Cloud synced**, then open **Logistics Network**; your existing Sadira system and planets should appear. No local MongoDB server, Node.js or Git installation is required beforehand.
 5. If cloud access fails, ensure Atlas Network Access allows this Windows machine's public IP, then reopen the app. If installation fails, use the setup log path printed by the script. Keep the window open until setup completes.
+
+## Automatic Windows updates
+
+Install the latest **DSP-Fieldguide-Setup.exe** from [Releases](https://github.com/cicatellid13/dyson/releases/latest) once to upgrade older installations that do not include an updater. Close the existing app first, then run the installer using the same Windows account. Your existing workspace and `%APPDATA%\dsp-wiki-desktop\.env` are preserved; do not uninstall or delete application data.
+
+After this upgrade, the app checks for new stable releases at startup and every four hours, downloads them in the background, and installs them when you normally close the app. Open it again to use the new version. Offline checks retry automatically. The small version label below Dark Fog identifies the running release.
+
+Pushing to `main` runs the Windows build/tests and publishes an update automatically. CI assigns `1.1.<workflow run number>` to both the installer and visible version. Installer, blockmap and `latest.yml` are uploaded to a draft before publishing; failed builds do not publish an update. The repository must be **public** for credential-free downloads. No GitHub token is stored on users' machines. These automatic updates currently target Windows x64 (including supported Windows ARM x64 emulation); Mac builds remain manually updated.
+
+Installers are currently unsigned; Windows may show its usual unknown-publisher notice during initial setup. Update downloads use HTTPS and the release manifest's SHA-512 integrity check. Keep GitHub publishing access restricted to trusted maintainers.

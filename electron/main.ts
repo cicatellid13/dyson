@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { Database } from './backend/database';
 import { Persistence } from './backend/persistence';
 import { validateWorkspace } from '../src/lib/workspace';
+import { autoUpdater } from 'electron-updater';
+import { startUpdates } from './backend/updates';
 import bundled from '../public/data/catalog.json';
 import type { Catalog } from '../src/lib/catalog';
 
@@ -52,5 +54,5 @@ function createWindow(){
   if(devServerUrl&&!app.isPackaged) void win.loadURL(devServerUrl);
   else void win.loadFile(path.join(__dirname,'../dist/index.html'));
 }
-if (hasInstanceLock) app.whenReady().then(()=>{setInterval(()=>{void persistence?.sync();},30000).unref();createWindow();app.on('activate',()=>{if(!BrowserWindow.getAllWindows().length)createWindow();});});
+if (hasInstanceLock) app.whenReady().then(()=>{setInterval(()=>{void persistence?.sync();},30000).unref();createWindow();startUpdates(autoUpdater, { packaged: app.isPackaged, platform: process.platform });app.on('activate',()=>{if(!BrowserWindow.getAllWindows().length)createWindow();});});
 app.on('window-all-closed',()=>{if(process.platform!=='darwin')app.quit();});

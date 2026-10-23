@@ -1,6 +1,6 @@
 {
   "name": "dsp-wiki-desktop",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Desktop client for the Dyson Sphere Program Fandom wiki",
   "main": "dist-electron/main.js",
   "author": "",
@@ -11,13 +11,14 @@
     "build:dir": "npm run typecheck && npm test && vite build && electron-builder --dir",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit",
-    "test": "node --test scripts/catalog.test.mjs scripts/design.test.mjs && tsx --test scripts/persistence.test.ts",
+    "test": "node --test scripts/catalog.test.mjs scripts/design.test.mjs && tsx --test scripts/persistence.test.ts scripts/updates.test.ts",
     "data:refresh": "python3 scripts/import-wiki.py",
     "db:seed": "tsx scripts/seed-database.ts"
   },
   "dependencies": {
     "@fontsource/orbitron": "^5.3.0",
     "dotenv": "^18.0.8",
+    "electron-updater": "^6.6.2",
     "mongodb": "^6.21.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
@@ -61,6 +62,14 @@
       "oneClick": true,
       "perMachine": false,
       "runAfterFinish": true
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "cicatellid13",
+        "repo": "dyson",
+        "releaseType": "release"
+      }
+    ]
   }
 }
