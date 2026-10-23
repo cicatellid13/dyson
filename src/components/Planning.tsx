@@ -45,7 +45,7 @@ export function Planning() {
   function addNote() {
     const note: PlanningNote = { id: crypto.randomUUID(), folderId: currentFolderId, title: currentFolderId === null ? nextScratchTitle(data.notes) : '', body: '', order: nextOrder(data.notes.filter(n => n.folderId === currentFolderId)) };
     commit(value => ({ ...value, notes: [...value.notes, note] }));
-    if (currentFolderId) expand(currentFolderId);
+    expand(currentFolderId ?? 'scratch-pad');
     setNoteId(note.id); setDeleting(null); setUndo(null);
   }
   function patch(changes: Partial<PlanningNote>) {
@@ -91,8 +91,8 @@ export function Planning() {
       <div className="design-create-buttons"><button className="design-button" onClick={addNote}>+ {currentFolderId ? 'Note' : 'Scratch'}</button><button className="design-button" onClick={() => setCreatingFolder(true)}>+ Folder</button></div>
       {creatingFolder && <form className="design-create-form" onSubmit={addFolder}><label>Folder name<input autoFocus aria-label="New folder name" value={folderName} maxLength={120} onChange={e => setFolderName(e.target.value)}/></label><div><button className="design-button" disabled={!folderName.trim()}>Create folder</button><button type="button" onClick={() => setCreatingFolder(false)}>Cancel</button></div></form>}
       <nav aria-label="Planning folders and notes">
-        <button className={`planning-folder-link ${currentFolderId === null ? 'active' : ''}`} onClick={() => { setFolderId(null); setNoteId(null); setDeleting(null); }}><PlanningIcon/>Scratch pad</button>
-        {ordered(data.notes.filter(note => note.folderId === null)).map(noteButton)}
+        <button className={`planning-folder-link ${currentFolderId === null ? 'active' : ''}`} aria-expanded={expanded.has('scratch-pad')} onClick={() => { setFolderId(null); setNoteId(null); setDeleting(null); setExpanded(current => { const next = new Set(current); if (next.has('scratch-pad')) next.delete('scratch-pad'); else next.add('scratch-pad'); return next; }); }}><span className="planning-chevron" aria-hidden="true">{expanded.has('scratch-pad') ? '▾' : '▸'}</span><PlanningIcon/>Scratch pad<small>{data.notes.filter(n => n.folderId === null).length}</small></button>
+        {expanded.has('scratch-pad') && ordered(data.notes.filter(note => note.folderId === null)).map(noteButton)}
         {ordered(data.folders).map(entry => <div key={entry.id} className="planning-folder-group"><button className={`planning-folder-link ${currentFolderId === entry.id ? 'active' : ''} ${dropTarget === entry.id ? 'drop-target' : ''}`} {...dragProps('folder', entry.id)} aria-expanded={expanded.has(entry.id)} onClick={() => { setFolderId(entry.id); setNoteId(null); setDeleting(null); setExpanded(current => { const next = new Set(current); if (next.has(entry.id)) next.delete(entry.id); else next.add(entry.id); return next; }); }}><span className="planning-chevron" aria-hidden="true">{expanded.has(entry.id) ? '▾' : '▸'}</span><PlanningIcon folder/><span>{entry.name.trim() || 'Untitled folder'}</span><small>{data.notes.filter(n => n.folderId === entry.id).length}</small></button>{expanded.has(entry.id) && ordered(data.notes.filter(note => note.folderId === entry.id)).map(noteButton)}</div>)}
       </nav>
     </aside>
@@ -100,7 +100,7 @@ export function Planning() {
       {undo && <div className="design-undo" role="status">{undo.label}<button onClick={restore}>Undo</button><button aria-label="Dismiss undo" onClick={() => setUndo(null)}>×</button></div>}
       {deleting && <div className="planning-delete-confirm" role="alert"><p>Delete {deleting.kind} “{deleteName?.trim() || `Untitled ${deleting.kind}`}”{deleting.kind === 'folder' ? ' and all notes inside it' : ''}?</p><button className="design-button danger" onClick={remove}>Delete {deleting.kind}</button><button onClick={() => setDeleting(null)}>Cancel</button></div>}
       {active ? <div key={active.id} className="planning-page">
-        <div className="planning-toolbar"><label>Folder<select aria-label="Note folder" value={active.folderId ?? ''} onChange={event => { const id = event.target.value || null; patch({ folderId: id, order: nextOrder(data.notes.filter(n => n.folderId === id)) }); setFolderId(id); if (id) expand(id); }}><option value="">Scratch pad</option>{ordered(data.folders).map(f => <option key={f.id} value={f.id}>{f.name || 'Untitled folder'}</option>)}</select></label><button className="design-remove" onClick={() => setDeleting({kind:'note',id:active.id})}>Delete note</button></div>
+        <div className="planning-toolbar"><label>Folder<select aria-label="Note folder" value={active.folderId ?? ''} onChange={event => { const id = event.target.value || null; patch({ folderId: id, order: nextOrder(data.notes.filter(n => n.folderId === id)) }); setFolderId(id); expand(id ?? 'scratch-pad'); }}><option value="">Scratch pad</option>{ordered(data.folders).map(f => <option key={f.id} value={f.id}>{f.name || 'Untitled folder'}</option>)}</select></label><button className="design-remove" onClick={() => setDeleting({kind:'note',id:active.id})}>Delete note</button></div>
         <input className="planning-title" aria-label="Note title" placeholder="Untitled note" value={active.title} maxLength={120} onChange={event => patch({title:event.target.value})}/>
         <AutoTextarea className="planning-body" aria-label="Note text" placeholder="Start writing…" value={active.body} onChange={event => patch({body:event.target.value})} spellCheck/>
       </div> : <div className="planning-folder-editor">

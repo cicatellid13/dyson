@@ -127,3 +127,5 @@ Import/export item pickers use custom dark menus with item names on the left and
 - Planning folders start collapsed and toggle their children with a disclosure arrow. Creating or moving a note into a folder expands that folder.
 - Rename Unfiled notes to Scratch pad. New scratch entries use scratch N, advancing beyond existing numbered titles; preserve existing titles.
 - Use outlined folder and document icons. Drag folder rows to reorder folders; drag notes to reorder within their current folder or Scratch pad. Highlight drop targets. Persist numeric ordering per record through validation, local recovery and MongoDB, keeping older records compatible and independent body edits mergeable.
+
+- Scratch pad also starts collapsed, has a disclosure arrow and note count, and expands when creating or moving a scratch into it.
