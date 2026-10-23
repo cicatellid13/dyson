@@ -149,3 +149,5 @@ Import/export item pickers use custom dark menus with item names on the left and
 - Empty systems explain how to start. Large systems scroll, labels remain readable, and buttons work with keyboard navigation.
 
 - The sidebar visualize control sits inside the system name card at its right edge, with the exact tooltip `visualize`; it remains a separate button so opening the graph does not toggle the system disclosure.
+
+- Planet artwork uses muted, softly shaded spheres without striped textures, decorative rings or glow; selection uses a thin outline.
