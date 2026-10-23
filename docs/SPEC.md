@@ -147,3 +147,5 @@ Import/export item pickers use custom dark menus with item names on the left and
 - Planets appear as shaded spherical worlds over faint stars. Directed lines reflect explicitly assigned same-system routes, deduplicating matching import/export records. Missing, external, self and hidden-item routes are excluded.
 - Select a planet to open an adjacent bounded cargo panel with resource icons/names and the established blue import and green export arrows. All visible cargo remains listed, including unassigned/external entries. No inferred routing or editable graph state.
 - Empty systems explain how to start. Large systems scroll, labels remain readable, and buttons work with keyboard navigation.
+
+- The sidebar visualize control sits inside the system name card at its right edge, with the exact tooltip `visualize`; it remains a separate button so opening the graph does not toggle the system disclosure.
