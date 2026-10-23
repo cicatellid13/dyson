@@ -119,7 +119,7 @@ Import/export item pickers use custom dark menus with item names on the left and
 - Packaged Windows installations check public GitHub releases on startup and every four hours. Development and Mac builds do not run the Windows updater.
 - Download stable newer versions in the background; disallow prereleases/downgrades and concurrent downloads. Failed checks/downloads retry without interrupting workspace use.
 - Install on normal app exit, after existing workspace shutdown persistence completes. Never force an active session to restart. Preserve app identity, userData, MongoDB configuration and recovery files.
-- Every successful main-branch Windows workflow produces version 1.1.<workflow run number>, builds/tests the installer, and stages installer, blockmap and latest.yml in a draft release before publishing atomically. Keep published versions immutable.
+- Every successful main-branch Windows workflow uses the package.json release version for a new series, then increments the patch above published releases in that series, builds/tests the installer, and stages installer, blockmap and latest.yml in a draft release before publishing atomically. Keep published versions immutable.
 - GitHub is a public download source only; no GitHub token or MongoDB credential is bundled. Existing installations need one manual upgrade to receive the updater.
 
 ## Responsive banner and Planning navigation

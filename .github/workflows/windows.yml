@@ -25,10 +25,21 @@ jobs:
           if ($parseErrors.Count) { $parseErrors | Format-List; exit 1 }
       - run: npm ci
       - name: Assign release version
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          $version = "1.1.$env:GITHUB_RUN_NUMBER"
-          npm version $version --no-git-tag-version
+          $base = [version](Get-Content package.json | ConvertFrom-Json).version
+          $releases = gh release list --limit 1000 --json tagName,isDraft,isPrerelease | ConvertFrom-Json
+          if ($LASTEXITCODE) { throw 'Could not read existing release versions.' }
+          $published = @($releases | Where-Object { -not $_.isDraft -and -not $_.isPrerelease -and $_.tagName -match '^v\d+\.\d+\.\d+$' } | ForEach-Object { [version]($_.tagName.Substring(1)) } | Sort-Object -Descending)
+          $version = $base.ToString()
+          if ($published.Count -and $published[0] -ge $base) {
+            $latest = $published[0]
+            if ($latest.Major -ne $base.Major -or $latest.Minor -ne $base.Minor) { throw 'Update package.json to the current release series.' }
+            $version = "$($base.Major).$($base.Minor).$($latest.Build + 1)"
+          }
+          npm version $version --no-git-tag-version --allow-same-version
           "RELEASE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
       - run: npm run build -- --win --x64 --publish never
         env:
