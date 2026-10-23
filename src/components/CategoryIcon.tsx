@@ -1,6 +1,7 @@
 /** Small, consistent line symbols for the library categories. */
 export function CategoryIcon({ category }: { category: string }) {
   const paths: Record<string, string> = {
+    'Planning': 'M6 3h13v18H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2ZM8 3v18M11 8h5m-5 4h5m-5 4h3',
     'Natural Resources': 'M12 3 4 9l2 10h12l2-10-8-6ZM4 9l8 4 8-4M12 13v6M8 6l4 7 4-7',
     'Materials': 'm3 9 5-4h11l2 6-5 5H5L3 9Zm0 0h12l6 2M15 9l1 7M5 16v3h11l5-5v-3',
     'Components': 'M8 8h8v8H8V8ZM9 3v5m6-5v5M9 16v5m6-5v5M3 9h5m-5 6h5m8-6h5m-5 6h5',

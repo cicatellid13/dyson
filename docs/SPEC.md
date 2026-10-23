@@ -100,3 +100,14 @@ Import/export item pickers use custom dark menus with item names on the left and
 - Revision compare-and-swap prevents lost updates. Three-way merge combines independent edits, including favorite membership. Conflicting notes, lists, or edit/delete operations require an explicit local/cloud choice and preserve a recovery backup.
 - Keep a renderer recovery outbox until backend acknowledgment; recover pending changes on restart. Surface pending, synced, offline, conflict, and save failures accurately.
 - Test independent merges, conflicts, deletion, minimal patches, revision retries, offline restart recovery and explicit conflict resolution. Confirm live catalog seeding and workspace migration without modifying unrelated cluster data.
+
+## Planet details and Planning
+- Planets have an optional editable type, preserved across local cache, MongoDB sync and restarts. Existing planets remain untyped until edited.
+- System and planet Notes start at two rows and grow/shrink with content and available width, including after navigating between planets.
+- System planet cards retain readable minimum widths. Item filter choices keep complete names on one line; menus may expand beyond the field within the viewport. Long selected values remain available in the input and its tooltip.
+- Import/export headings share the same heavy industrial arrows and blue-import/green-export colors as the system cards.
+- Removal confirmation and undo messages name the removed kind: Planet removed or System removed.
+- The Dysons Sphere title uses a bundled futuristic display font, available offline.
+- Planning is a top-level navigation section directly below Logistics Network. Users can create, rename and delete folders, create/edit/move/delete plain-text notes, and keep notes outside folders. Deletions require confirmation and offer undo. No Save button; use the existing recovery, debounce, conflict and cloud-sync mechanisms.
+- Planning data defaults to empty for old workspaces. Store notes/folders by ID in MongoDB and patch only changed records. Concurrent changes to separate notes merge; conflicting note bodies or folder deletion versus editing require resolution. Existing systems, planets, routes and favorites must survive migration.
+- Export validation behavior is unchanged (the user withdrew that request).

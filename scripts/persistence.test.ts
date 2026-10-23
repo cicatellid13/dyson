@@ -35,9 +35,9 @@ test('offline saves survive restart; recovery, revision retry and conflicts pres
  let p=new Persistence(db,cache,()=>{});
  try {
   await p.initialize(fixture(),bundled);
-  const next=fixture();next.design.sections[0].notes='saved offline';offline=true;
+  const next=fixture();next.design.sections[0].notes='saved offline';next.planning={folders:[{id:'folder',name:'Factory'}],notes:[{id:'note',folderId:'folder',title:'Smelters',body:'Keep this offline plan'}]};offline=true;
   await p.save(next,fixture());await p.sync(); assert.equal(p.view().status,'offline');await p.close();
-  p=new Persistence(db,cache,()=>{});await p.initialize(fixture(),bundled);assert.equal(p.view().data.design.sections[0].notes,'saved offline');
+  p=new Persistence(db,cache,()=>{});await p.initialize(fixture(),bundled);assert.equal(p.view().data.design.sections[0].notes,'saved offline');assert.equal(p.view().data.planning.notes[0].body,'Keep this offline plan');
   offline=false;collisions=1;await p.sync();assert.equal(remote.design.sections[0].notes,'saved offline');assert.equal(writes,2);
   assert.equal((await p.initialize(fixture(),bundled)).view.data.design.sections[0].notes,'saved offline');
   const before=copy(p.view().data), recovered=copy(before);recovered.darkFog=true;await p.close();
@@ -51,4 +51,35 @@ test('offline saves survive restart; recovery, revision retry and conflicts pres
   await p.resolve('cloud');assert.equal(p.view().data.design.sections[0].notes,'new remote');
   assert.ok(JSON.parse(await readFile(cache,'utf8')).data);
  }finally{await p.close();await rm(dir,{recursive:true,force:true});}
+});
+
+test('old workspace records gain empty planning without changing planets or favorites', async () => {
+ const { validateWorkspace } = await import('../src/lib/workspace');
+ const old = { design:fixture().design, favorites:[1303], darkFog:true };
+ const migrated=validateWorkspace(old);
+ assert.deepEqual(migrated.planning,{folders:[],notes:[]});
+ assert.deepEqual(migrated.design,old.design); assert.deepEqual(migrated.favorites,[1303]);
+});
+test('planning records merge and patch independently; same-note and folder-deletion conflicts remain visible', async () => {
+ const { removePlanningFolder } = await import('../src/lib/planning');
+ const base=fixture();
+ base.planning={folders:[{id:'plans',name:'Plans'}],notes:[{id:'a',folderId:'plans',title:'Forge',body:''},{id:'b',folderId:'plans',title:'Mining',body:''}]};
+ const local=copy(base), remote=copy(base);
+ local.planning.notes[0].body='Build smelters'; remote.planning.notes[1].body='Find iron';
+ const merged=mergeWorkspace(base,local,remote);
+ assert.equal(merged.planning.notes[0].body,'Build smelters');assert.equal(merged.planning.notes[1].body,'Find iron');
+ assert.deepEqual(Object.keys(workspacePatch(encode(base),encode(local)).set),['data.notes.a']);
+ remote.planning.notes[0].body='Different plan';assert.throws(()=>mergeWorkspace(base,local,remote));
+ local.planning=removePlanningFolder(base.planning,'plans');assert.throws(()=>mergeWorkspace(base,local,remote));
+ assert.deepEqual(Object.keys(workspacePatch(encode(base),encode(local)).unset).sort(),['data.folders.plans','data.notes.a','data.notes.b']);
+});
+test('planning validation rejects orphaned notes and unsafe record IDs', async()=>{
+ const {validateWorkspace}=await import('../src/lib/workspace');
+ const data=fixture();data.planning.notes=[{id:'note',folderId:'missing',title:'Plan',body:'text'}];assert.throws(()=>validateWorkspace(data));
+ data.planning.notes[0].folderId=null; data.planning.notes[0].id='__proto__';assert.throws(()=>validateWorkspace(data));
+});
+test('planet types survive validation and merge with independent edits',()=>{
+ const base=fixture();base.design.sections.push({id:'earth',parentId:'sol',kind:'planet',name:'Earth',notes:'',imports:[],exports:[]});
+ const local=copy(base), remote=copy(base);local.design.sections[1].planetType='Ocean';remote.design.sections[0].notes='System plan';
+ const result=mergeWorkspace(base,local,remote);assert.equal(result.design.sections[1].planetType,'Ocean');assert.equal(result.design.sections[0].notes,'System plan');
 });

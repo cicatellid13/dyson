@@ -9,6 +9,8 @@ An offline desktop item and recipe reference for Dyson Sphere Program, for macOS
 - Expandable production chains with cycle protection
 - Persistent favorites
 - Logistics Network: systems with nested planets, notes, import/export routes, and per-planet filters. Data saves locally and syncs across machines through MongoDB.
+- Planning: folders and plain-text notes with automatic saving, offline recovery and cross-machine sync.
+- Planet types, compact expanding notes, and readable item filters for larger systems.
 - Dark Fog toggle hides combat content throughout the app or restores it in full color.
 
 ## Run
@@ -86,7 +88,7 @@ Development reads the project `.env`. Installed apps read:
 
 Use the fields from `.env.example`. The Windows setup script asks for the URI using hidden input and creates the file for you. Configure the same database on each computer; its IP must be permitted by your Atlas network settings. Real credentials are ignored by Git and excluded from installers. Database access stays inside the Electron backend; this is a trusted, single-user desktop deployment.
 
-Edits save locally immediately and sync after a 750 ms pause. A shared workspace document allows an atomic revision check; only changed sections or settings are written. Independent changes merge, while conflicting edits show a choice and retain a backup. The app checks other devices every 30 seconds and when focused. Offline edits retry automatically. Initial connection requires network access; subsequent launches use the cache. Local recovery files live beside the installed app’s `.env`.
+Edits save locally immediately and sync after a 750 ms pause. A shared workspace document allows an atomic revision check; only changed sections, planning folders/notes, or settings are written. Independent changes merge, while conflicting edits show a choice and retain a backup. The app checks other devices every 30 seconds and when focused. Offline edits retry automatically. Initial connection requires network access; subsequent launches use the cache. Local recovery files live beside the installed app’s `.env`.
 
 Catalog seeding is intentionally idempotent. A new wiki snapshot requires an explicit backend catalog migration; `data:refresh` alone does not overwrite the shared catalog. Images remain bundled with the app.
 

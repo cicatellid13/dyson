@@ -1,3 +1,5 @@
+import { AutoTextarea } from './AutoTextarea';
+import { LogisticsArrow } from './LogisticsArrow';
 import { useWorkspace, updateWorkspace } from '../lib/persistence';
 import { useMemo, useState } from 'react';
 import { isDefenseItem, type Catalog, type Item } from '../lib/catalog';
@@ -24,7 +26,7 @@ function TradeList({ direction, entries, items, sections, onChange }: {
     setSearch(''); setMessage('');
   }
   return <section className="trade-panel" aria-label={label}>
-    <div className="design-section-heading"><h3>{direction === 'imports' ? '↙' : '↗'} {label}</h3><span>{orderedEntries.length} entries</span></div>
+    <div className="design-section-heading"><h3><LogisticsArrow direction={direction}/> {label}</h3><span>{orderedEntries.length} entries</span></div>
     <form className="trade-add" onSubmit={add}>
       <ItemPicker label={`Add ${direction} item`} items={sortedItems} value={search} onChange={value => { setSearch(value); setMessage(''); }}/>
       <button type="submit" className="design-button" disabled={!search.trim()}>+ Add</button>
@@ -61,7 +63,7 @@ function PlanetTradeSummary({ entries, direction, items }: {
         {item?.icon && <img className="item-icon" src={`${import.meta.env.BASE_URL}${item.icon}`} alt=""/>}
         <span className="planet-trade-name">{item?.name ?? `Item ${entry.itemId}`}</span>
         <span className="planet-trade-arrow" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M3 12h18m-6-6 6 6-6 6"/></svg>
+          <LogisticsArrow direction={direction}/>
         </span>
       </span>;
     }) : <span className="planet-trade-empty">None</span>}
@@ -86,11 +88,11 @@ function PlanetCard({ planet, items, onOpen }: { planet: DesignSection; items: M
   const exports = planet.exports.filter(entry => items.has(entry.itemId) && (!selected || entry.itemId === selected));
   const visibleCount = (direction !== 'exports' ? imports.length : 0) + (direction !== 'imports' ? exports.length : 0);
   return <article className="planet-card" aria-label={`${planet.name} trade overview`}>
-    <button className="planet-card-open" onClick={onOpen} aria-label={`Open ${planet.name}`}><span aria-hidden="true">◉</span><strong>{planet.name || 'Unnamed planet'}</strong><span className="planet-open-hint">Open planet ↗</span></button>
+    <button className="planet-card-open" onClick={onOpen} aria-label={`Open ${planet.name}`}><span aria-hidden="true">◉</span><strong>{planet.name || 'Unnamed planet'}</strong>{planet.planetType && <small className="planet-type-label">{planet.planetType}</small>}<span className="planet-open-hint">Open planet ↗</span></button>
     <div className="planet-card-filters">
       <div className="logistics-filter"><span className="logistics-filter-label">Logistics</span><div className="logistics-bubbles" role="group" aria-label={`${planet.name} logistics filter`}>
         {(['imports', 'exports'] as const).map(value => <button key={value} type="button" className={`logistics-bubble ${value}`} aria-label={`${planet.name} ${value} filter`} aria-pressed={direction === value} onClick={() => changeDirection(value)}>
-          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 12h18m-6-6 6 6-6 6"/></svg>
+          <LogisticsArrow direction={value}/>
           <span className="logistics-tooltip" role="tooltip">{value === 'imports' ? 'Imports' : 'Exports'}</span>
         </button>)}
       </div></div>
@@ -113,7 +115,7 @@ export function Design({ catalog }: { catalog: Catalog }) {
   const [creation, setCreation] = useState<{kind: DesignSection['kind']; parentId: string | null; placement: 'sidebar' | 'inline'} | null>(null);
   const [name, setName] = useState('');
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [undo, setUndo] = useState<{data: DesignData; activeId: string | null} | null>(null);
+  const [undo, setUndo] = useState<{data: DesignData; activeId: string | null; kind: 'planet' | 'system'} | null>(null);
   const active = data.sections.find(s => s.id === activeId);
   const parent = data.sections.find(s => s.id === active?.parentId);
   const currentSystem = active?.kind === 'system' ? active : parent;
@@ -143,7 +145,7 @@ export function Design({ catalog }: { catalog: Catalog }) {
     if (!deleteId) return;
     const removed = data.sections.find(s => s.id === deleteId);
     const next = removeSection(data, deleteId);
-    const previous = { data: { ...data, sections: data.sections.filter(s => !next.sections.some(kept => kept.id === s.id)) }, activeId };
+    const previous = { data: { ...data, sections: data.sections.filter(s => !next.sections.some(kept => kept.id === s.id)) }, activeId, kind: removed?.kind ?? 'planet' };
     commit(next); setUndo(previous); setActiveId(removed?.parentId ?? next.sections[0]?.id ?? null); setDeleteId(null);
   }
   function sectionButton(section: DesignSection, nested = false) {
@@ -163,16 +165,17 @@ export function Design({ catalog }: { catalog: Catalog }) {
     </aside>
     <section className="design-editor">
       {saveError && <div role="alert" className="design-error">{saveError}{!initial.error && <button className="design-button" onClick={() => commit(data)}>Retry saving</button>}</div>}
-      {undo && <div className="design-undo">Section removed.<button onClick={() => { const restored = [...data.sections, ...undo.data.sections.filter(s => !data.sections.some(current => current.id === s.id))]; commit({ ...data, sections: restored.filter(s => !s.parentId || restored.some(parent => parent.id === s.parentId)) }); setActiveId(undo.activeId); setUndo(null); }}>Undo</button><button aria-label="Dismiss undo" onClick={() => setUndo(null)}>×</button></div>}
+      {undo && <div className="design-undo">{undo.kind === 'planet' ? 'Planet removed.' : 'System removed.'}<button onClick={() => { const restored = [...data.sections, ...undo.data.sections.filter(s => !data.sections.some(current => current.id === s.id))]; commit({ ...data, sections: restored.filter(s => !s.parentId || restored.some(parent => parent.id === s.parentId)) }); setActiveId(undo.activeId); setUndo(null); }}>Undo</button><button aria-label="Dismiss undo" onClick={() => setUndo(null)}>×</button></div>}
       {active ? <div key={active.id}>
         <div className="design-editor-top"><div className="eyebrow">{parent ? <><button onClick={() => navigate(parent.id)}>{parent.name || 'Unnamed system'}</button> / PLANET</> : active.kind === 'system' ? 'STAR SYSTEM' : 'PLANET'}</div></div>
         <label className="design-name">Name<input aria-label="Section name" value={active.name} maxLength={120} onChange={e => patch({name: e.target.value})} onBlur={() => { if (!active.name.trim()) patch({name: active.kind === 'planet' ? 'Untitled planet' : 'Untitled system'}); }}/></label>
+        {active.kind === 'planet' && <label className="design-planet-type">Planet type<input aria-label="Planet type" value={active.planetType ?? ''} maxLength={120} placeholder="e.g. Lava, Ocean, Gas giant" onChange={event => patch({planetType:event.target.value})}/></label>}
         {active.kind === 'planet' && !parent && <div className="design-assignment"><label>Assign to a system<select aria-label="Assign planet to system" value="" onChange={event => { if (roots.some(system => system.id === event.target.value)) patch({parentId: event.target.value}); }}><option value="">Select a system</option>{roots.map(system => <option key={system.id} value={system.id}>{system.name}</option>)}</select></label>{!roots.length && <p className="design-empty-small">Create a system using + System, then assign this planet here. Your notes and routes are preserved.</p>}</div>}
         {active.kind === 'system' && <section className="design-planets"><div className="design-section-heading"><h3>Planets in this system</h3><button className="design-button" onClick={() => begin('planet', active.id)}>+ Add planet</button></div>{creation?.kind === 'planet' && creation.placement === 'inline' && creation.parentId === active.id && <form className="design-create-form design-inline-create" onSubmit={add}><h3>Add planet to {active.name}</h3><label>Planet name<input autoFocus aria-label="New planet name" value={name} maxLength={120} placeholder="e.g. Homeworld" onChange={event => setName(event.target.value)}/></label><div><button className="design-button" type="submit" disabled={!name.trim()}>Create planet</button><button type="button" onClick={() => setCreation(null)}>Cancel</button></div></form>}<div className="design-planet-cards">{children.map(child => <PlanetCard key={`${child.id}-${catalog.items.length}`} planet={child} items={itemLookup} onOpen={() => navigate(child.id)}/>)}</div>{!children.length && <p className="design-empty-small">Add a planet to start mapping this system.</p>}</section>}
-        <label className="design-notes">Notes<textarea aria-label="Section notes" placeholder="Resources, production goals, construction plans…" value={active.notes} onChange={e => patch({notes: e.target.value})}/></label>
+        <label className="design-notes">Notes<AutoTextarea aria-label="Section notes" placeholder="Resources, production goals, construction plans…" value={active.notes} onChange={e => patch({notes: e.target.value})}/></label>
         <div className="design-trade-grid"><TradeList key={`imports-${catalog.items.length}`} direction="imports" entries={active.imports} items={catalog.items} sections={data.sections} onChange={imports => patch({imports})}/><TradeList key={`exports-${catalog.items.length}`} direction="exports" entries={active.exports} items={catalog.items} sections={data.sections} onChange={exports => patch({exports})}/></div>
         {active.kind === 'system' && <p className="note">These lists describe this system. Each planet keeps its own notes and trade lists; they are not automatically combined.</p>}
-        <div className="design-delete-area">{deleteId === active.id ? <div role="alert"><p>Delete “{active.name}”{active.kind === 'system' ? ` and its ${children.length} planets` : ''}, including all notes and lists?</p><button className="design-button danger" onClick={confirmRemove}>Delete section</button><button onClick={() => setDeleteId(null)}>Cancel</button></div> : <button className="design-remove" onClick={() => setDeleteId(active.id)}>Delete {active.kind}</button>}</div>
+        <div className="design-delete-area">{deleteId === active.id ? <div role="alert"><p>Delete “{active.name}”{active.kind === 'system' ? ` and its ${children.length} planets` : ''}, including all notes and lists?</p><button className="design-button danger" onClick={confirmRemove}>Delete {active.kind}</button><button onClick={() => setDeleteId(null)}>Cancel</button></div> : <button className="design-remove" onClick={() => setDeleteId(active.id)}>Delete {active.kind}</button>}</div>
       </div> : <div className="design-welcome"><span>✧</span><h2>Design your interstellar network.</h2><p>Create a system, add its planets,<br/>and track what comes in and what goes out.</p><button className="design-button" disabled={!!initial.error} onClick={() => begin('system')}>Create your first system</button></div>}
     </section>
   </div>;

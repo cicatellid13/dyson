@@ -13,6 +13,7 @@ export type DesignSection = {
   parentId: string | null;
   name: string;
   notes: string;
+  planetType?: string;
   imports: TradeEntry[];
   exports: TradeEntry[];
 };
@@ -34,6 +35,7 @@ export function parseDesign(raw: string | null): DesignData {
   for (const s of data.sections) {
     if (!s || typeof s.id !== 'string' || ids.has(s.id) || !['planet', 'system'].includes(s.kind) ||
       typeof s.name !== 'string' || typeof s.notes !== 'string' || (s.parentId !== null && typeof s.parentId !== 'string')) throw Error('Invalid design section.');
+    if (s.planetType !== undefined && (typeof s.planetType !== 'string' || s.planetType.length > 120)) throw Error('Invalid planet type.');
     ids.add(s.id);
     for (const list of [s.imports, s.exports]) {
       if (!Array.isArray(list) || list.some(e => !e || typeof e.id !== 'string' || !Number.isInteger(e.itemId) || typeof e.amount !== 'string' ||

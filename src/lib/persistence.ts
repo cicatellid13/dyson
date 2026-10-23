@@ -1,3 +1,4 @@
+import { emptyPlanning } from './planning';
 import { useSyncExternalStore } from 'react';
 import { DESIGN_KEY, parseDesign } from './design';
 import { emptyWorkspace, type Workspace, type SyncView } from './workspace';
@@ -18,7 +19,7 @@ function backup(data: Workspace) {
 }
 function legacy(): Workspace {
   const raw = JSON.parse(localStorage.getItem('dsp-favorites') ?? '[]');
-  return { design: parseDesign(localStorage.getItem(DESIGN_KEY)), favorites: Array.isArray(raw) ? raw.filter(Number.isInteger) : [], darkFog: localStorage.getItem('dsp-dark-fog') === 'true' };
+  return { planning: emptyPlanning(), design: parseDesign(localStorage.getItem(DESIGN_KEY)), favorites: Array.isArray(raw) ? raw.filter(Number.isInteger) : [], darkFog: localStorage.getItem('dsp-dark-fog') === 'true' };
 }
 export function initializePersistence() {
   if (initialization) return initialization;

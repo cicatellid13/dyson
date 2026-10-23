@@ -1,8 +1,10 @@
+import { isDeepStrictEqual } from 'node:util';
+import type { PlanningFolder, PlanningNote } from '../../src/lib/planning';
 import { validateWorkspace, type Workspace } from '../../src/lib/workspace';
-export type StoredData = { sections: Record<string, Workspace['design']['sections'][number]>; favorites: number[]; darkFog: boolean };
-export function encode(data: Workspace): StoredData { return { sections: Object.fromEntries(data.design.sections.map(s => [s.id, s])), favorites: data.favorites, darkFog: data.darkFog }; }
-export function decode(data: StoredData): Workspace { return validateWorkspace({ design: { version: 1, sections: Object.values(data.sections) }, favorites: data.favorites, darkFog: data.darkFog }); }
-const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+export type StoredData = { sections: Record<string, Workspace['design']['sections'][number]>; favorites: number[]; darkFog: boolean; folders?: Record<string, PlanningFolder>; notes?: Record<string, PlanningNote> };
+export function encode(data: Workspace): StoredData { return { folders: Object.fromEntries((data.planning?.folders ?? []).map(f => [f.id, f])), notes: Object.fromEntries((data.planning?.notes ?? []).map(n => [n.id, n])), sections: Object.fromEntries(data.design.sections.map(s => [s.id, s])), favorites: data.favorites, darkFog: data.darkFog }; }
+export function decode(data: StoredData): Workspace { return validateWorkspace({ planning: { folders: Object.values(data.folders ?? {}), notes: Object.values(data.notes ?? {}) }, design: { version: 1, sections: Object.values(data.sections) }, favorites: data.favorites, darkFog: data.darkFog }); }
+const same = isDeepStrictEqual;
 const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
 export function mergeValue(base: unknown, local: unknown, remote: unknown): unknown {
   if (same(local, base)) return remote;
@@ -30,6 +32,13 @@ export function workspacePatch(previous: StoredData, next: StoredData) {
   for (const id of new Set([...Object.keys(previous.sections), ...Object.keys(next.sections)])) {
     if (!next.sections[id]) unset[`data.sections.${id}`] = '';
     else if (!same(previous.sections[id], next.sections[id])) set[`data.sections.${id}`] = next.sections[id];
+  }
+  for (const key of ['folders', 'notes'] as const) {
+    const before = previous[key] ?? {}, after = next[key] ?? {};
+    for (const id of new Set([...Object.keys(before), ...Object.keys(after)])) {
+      if (!after[id]) unset[`data.${key}.${id}`] = '';
+      else if (!same(before[id], after[id])) set[`data.${key}.${id}`] = after[id];
+    }
   }
   if (!same(previous.favorites, next.favorites)) set['data.favorites'] = next.favorites;
   if (previous.darkFog !== next.darkFog) set['data.darkFog'] = next.darkFog;

@@ -49,3 +49,5 @@
 .dark-fog-normal .planet-trade-row.defense-item { color: #cfddd6; }
 .sync-banner { padding: 10px 20px; background: #293b32; color: #d8e9df; font-size: 12px; }
 .sync-banner button,.error button { margin-left: 12px; text-decoration: underline; }
+
+.sphere-title h1{font-family:'Orbitron',sans-serif;font-size:clamp(26px,3.1vw,46px);font-weight:600;letter-spacing:.045em;text-transform:uppercase;color:#e3f5ef;text-shadow:0 2px 20px #000,0 0 24px #b9e5d226;line-height:1.35}

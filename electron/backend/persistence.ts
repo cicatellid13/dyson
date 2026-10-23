@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from 'node:util';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { Database } from './database';
@@ -6,7 +7,7 @@ import { validateWorkspace, type Workspace, type SyncView } from '../../src/lib/
 import type { Catalog } from '../../src/lib/catalog';
 
 type Cache = { base: Workspace; data: Workspace; catalog: Catalog };
-const equal = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+const equal = isDeepStrictEqual;
 export class Persistence {
   private cache!: Cache;
   private status: SyncView['status'] = 'synced';
