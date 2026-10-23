@@ -139,3 +139,5 @@ Import/export item pickers use custom dark menus with item names on the left and
 - Required input rows, including nested expanded inputs, can be dragged to the Favorites navigation option or anywhere in its catalog pane while Favorites is selected. Preserve ordinary click-to-expand behavior.
 - Highlight both available destinations and the active drop target. Accept only known visible catalog items dragged from this app; ignore unrelated drag payloads. Add without toggling/removing existing favorites or creating duplicates, and show a brief confirmation.
 - Keep the current recipe selected. When dropping into an open Favorites pane, clear its search so the added item is visible. Persist through the existing shared favorites mechanism.
+
+- Favorites rows show a small labeled remove icon on the right instead of a star. Removing saves immediately without changing the selected recipe; other catalog rows use their normal navigation chevron.
