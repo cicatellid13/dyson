@@ -3,7 +3,7 @@ import { LogisticsArrow } from './LogisticsArrow';
 import { useWorkspace, updateWorkspace } from '../lib/persistence';
 import { useMemo, useState } from 'react';
 import { isDefenseItem, type Catalog, type Item } from '../lib/catalog';
-import { createSection, removeSection, type DesignData, type DesignSection, type TradeEntry } from '../lib/design';
+import { createSection, removeSection, orderedSections, reorderSections, type DesignData, type DesignSection, type TradeEntry } from '../lib/design';
 import '../styles/design.css';
 import { PlanetPicker } from './PlanetPicker';
 import { ItemPicker } from './ItemPicker';
@@ -116,13 +116,17 @@ export function Design({ catalog }: { catalog: Catalog }) {
   const [name, setName] = useState('');
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [undo, setUndo] = useState<{data: DesignData; activeId: string | null; kind: 'planet' | 'system'} | null>(null);
+  const [expandedSystems, setExpandedSystems] = useState<Set<string>>(new Set());
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
+  function expandSystem(id: string) { setExpandedSystems(current => new Set([...current,id])); }
   const active = data.sections.find(s => s.id === activeId);
   const parent = data.sections.find(s => s.id === active?.parentId);
   const currentSystem = active?.kind === 'system' ? active : parent;
   const creationSystem = data.sections.find(section => section.id === creation?.parentId);
-  const children = data.sections.filter(s => s.parentId === activeId);
-  const roots = data.sections.filter(s => s.kind === 'system');
-  const unassigned = data.sections.filter(s => s.kind === 'planet' && s.parentId === null);
+  const children = orderedSections(data.sections.filter(s => s.parentId === activeId));
+  const roots = orderedSections(data.sections.filter(s => s.kind === 'system'));
+  const unassigned = orderedSections(data.sections.filter(s => s.kind === 'planet' && s.parentId === null));
   function commit(next: DesignData) {
     updateWorkspace(current => ({...current, design: next}));
     setUndo(null);
@@ -134,11 +138,14 @@ export function Design({ catalog }: { catalog: Catalog }) {
     if (kind === 'planet' && !roots.some(system => system.id === parentId)) return;
     setCreation({kind, parentId, placement}); setName('');
   }
-  function navigate(id: string) { setActiveId(id); setCreation(null); setName(''); setDeleteId(null); }
+  function navigate(id: string) { const target = data.sections.find(s => s.id === id); if (target?.parentId) expandSystem(target.parentId); setActiveId(id); setCreation(null); setName(''); setDeleteId(null); }
   function add(event: React.FormEvent) {
     event.preventDefault(); if (!creation || !name.trim()) return;
     if (creation.kind === 'planet' && !roots.some(system => system.id === creation.parentId)) return;
     const section = createSection(name, creation.kind, creation.parentId);
+    const siblings = data.sections.filter(s => s.kind === section.kind && s.parentId === section.parentId);
+    section.order = Math.max(-1, ...siblings.map((s,index) => s.order ?? index)) + 1;
+    if (section.parentId) expandSystem(section.parentId);
     commit({ ...data, sections: [...data.sections, section] }); setActiveId(section.id); setCreation(null); setName('');
   }
   function confirmRemove() {
@@ -149,7 +156,14 @@ export function Design({ catalog }: { catalog: Catalog }) {
     commit(next); setUndo(previous); setActiveId(removed?.parentId ?? next.sections[0]?.id ?? null); setDeleteId(null);
   }
   function sectionButton(section: DesignSection, nested = false) {
-    return <button key={section.id} className={`design-location ${nested ? 'nested' : ''} ${activeId === section.id ? 'active' : ''}`} onClick={() => navigate(section.id)}>
+    return <button key={section.id} className={`design-location ${nested ? 'nested' : ''} ${activeId === section.id ? 'active' : ''} ${dropTarget === section.id ? 'drop-target' : ''}`} draggable
+      aria-expanded={section.kind === 'system' ? expandedSystems.has(section.id) : undefined}
+      onDragStart={event => { event.stopPropagation(); setDraggingId(section.id); event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain',section.id); }}
+      onDragOver={event => { const from = data.sections.find(s => s.id === draggingId); if (!from || from.id === section.id || from.kind !== section.kind || from.parentId !== section.parentId) return; event.preventDefault(); event.dataTransfer.dropEffect = 'move'; setDropTarget(section.id); }}
+      onDrop={event => { event.preventDefault(); if (draggingId) commit(reorderSections(data,draggingId,section.id)); setDraggingId(null); setDropTarget(null); }}
+      onDragEnd={() => { setDraggingId(null); setDropTarget(null); }}
+      onClick={() => { navigate(section.id); if (section.kind === 'system') setExpandedSystems(current => { const next = new Set(current); if (next.has(section.id)) next.delete(section.id); else next.add(section.id); return next; }); }}>
+      {section.kind === 'system' && <span className="design-disclosure" aria-hidden="true">{expandedSystems.has(section.id) ? '▾' : '▸'}</span>}
       <span>{section.kind === 'system' ? '✧' : '◉'}</span><span><strong>{section.name || 'Unnamed location'}</strong><small>{section.kind === 'system' ? `${data.sections.filter(p => p.parentId === section.id).length} planet${data.sections.filter(p => p.parentId === section.id).length === 1 ? '' : 's'}` : 'Planet'}</small></span>
     </button>;
   }
@@ -159,7 +173,7 @@ export function Design({ catalog }: { catalog: Catalog }) {
       <div className="design-create-buttons">{currentSystem && <button className="design-button" onClick={() => begin('planet', currentSystem.id, 'sidebar')} disabled={!!initial.error}>+ Planet</button>}<button className="design-button" onClick={() => begin('system')} disabled={!!initial.error}>+ System</button></div>
       {creation?.kind === 'planet' && creation.placement === 'sidebar' && creationSystem && <form className="design-create-form" onSubmit={add}><h3>New planet</h3><p className="design-parent-hint">Adding to <strong>{creationSystem.name || 'Unnamed system'}</strong></p><label>Planet name<input autoFocus aria-label="New planet name" value={name} maxLength={120} placeholder="e.g. Homeworld" onChange={event => setName(event.target.value)}/></label><div><button className="design-button" type="submit" disabled={!name.trim()}>Create planet</button><button type="button" onClick={() => setCreation(null)}>Cancel</button></div></form>}
       {creation?.kind === 'system'  && <form className="design-create-form" onSubmit={add}><h3>{creation.parentId ? 'Add planet to system' : `New ${creation.kind}`}</h3><label>Name<input autoFocus aria-label="New section name" value={name} maxLength={120} placeholder="e.g. Alpha Centauri" onChange={e => setName(e.target.value)}/></label><div><button className="design-button" type="submit" disabled={!name.trim()}>Create</button><button type="button" onClick={() => setCreation(null)}>Cancel</button></div></form>}
-      <nav aria-label="Logistics Network sections">{roots.map(root => <div key={root.id}>{sectionButton(root)}{data.sections.filter(s => s.parentId === root.id).map(child => sectionButton(child, true))}</div>)}</nav>
+      <nav aria-label="Logistics Network sections">{roots.map(root => <div key={root.id}>{sectionButton(root)}{expandedSystems.has(root.id) && orderedSections(data.sections.filter(s => s.parentId === root.id)).map(child => sectionButton(child, true))}</div>)}</nav>
       {!!unassigned.length && <div className="design-unassigned"><h3>Needs a system</h3><p className="design-empty-small">Assign these existing planets to a system.</p>{unassigned.map(planet => sectionButton(planet))}</div>}
       {!roots.length && <p className="design-empty-small">Create a system first, then add planets inside it.</p>}
     </aside>

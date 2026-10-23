@@ -129,3 +129,8 @@ Import/export item pickers use custom dark menus with item names on the left and
 - Use outlined folder and document icons. Drag folder rows to reorder folders; drag notes to reorder within their current folder or Scratch pad. Highlight drop targets. Persist numeric ordering per record through validation, local recovery and MongoDB, keeping older records compatible and independent body edits mergeable.
 
 - Scratch pad also starts collapsed, has a disclosure arrow and note count, and expands when creating or moving a scratch into it.
+
+## Logistics Network hierarchy navigation
+- Systems start collapsed with a disclosure arrow; clicking a system toggles its planets while opening the system editor. Creating a planet or opening it from a system card expands its parent.
+- Drag systems to reorder systems and planets to reorder siblings within the same system. Reordering never reparents a planet. Highlight valid drop targets and retain the current selection.
+- Store optional numeric order per section, preserve legacy order until changed, and use the same saved planet order for sidebar rows and system cards. Cloud round trips preserve order and merge independent notes edits.

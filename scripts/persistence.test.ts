@@ -100,3 +100,20 @@ test('planning order survives database encoding and merges with independent note
  assert.equal(nextScratchTitle(base.planning.notes),'scratch 3');
  assert.equal(nextScratchTitle([]),'scratch 1');
 });
+
+test('system and planet ordering preserves hierarchy and survives cloud encoding', async () => {
+ const { orderedSections, reorderSections } = await import('../src/lib/design');
+ const { decode } = await import('../electron/backend/merge');
+ const base = fixture();
+ const system = base.design.sections[0];
+ base.design.sections.push({...system,id:'other',name:'Other'}, {...system,id:'p1',kind:'planet',parentId:'sol'}, {...system,id:'p2',kind:'planet',parentId:'sol'}, {...system,id:'p3',kind:'planet',parentId:'other'});
+ const local=copy(base), remote=copy(base);
+ local.design = reorderSections(reorderSections(local.design,'other','sol'),'p2','p1');
+ remote.design.sections.find(s=>s.id==='p1')!.notes='Keep this edit';
+ const result=decode(encode(mergeWorkspace(base,local,remote)));
+ assert.deepEqual(orderedSections(result.design.sections.filter(s=>s.kind==='system')).map(s=>s.id),['other','sol']);
+ assert.deepEqual(orderedSections(result.design.sections.filter(s=>s.parentId==='sol')).map(s=>s.id),['p2','p1']);
+ assert.equal(result.design.sections.find(s=>s.id==='p1')!.notes,'Keep this edit');
+ assert.deepEqual(reorderSections(base.design,'p1','p3'),base.design);
+ assert.deepEqual(reorderSections(base.design,'sol','p1'),base.design);
+});
