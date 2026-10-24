@@ -127,3 +127,12 @@ test('logistics graph resolves direction, deduplicates mirrored cargo and exclud
  assert.deepEqual(logisticsRoutes([a,b],new Set([1001])),[{from:'a',to:'b',items:[1001]}]);
  assert.deepEqual(logisticsRoutes([],new Set()),[]);
 });
+
+test('favorite order survives sync while independent additions are retained', () => {
+ const base=fixture();base.favorites=[1,2,3];
+ const local=copy(base),remote=copy(base);local.favorites=[3,1,2];remote.favorites=[1,2,3,4];
+ assert.deepEqual(mergeWorkspace(base,local,remote).favorites,[3,1,2,4]);
+ assert.deepEqual(mergeWorkspace(base,base,local).favorites,[3,1,2]);
+ const conflict=copy(base);conflict.favorites=[2,1,3];
+ assert.throws(()=>mergeWorkspace(base,local,conflict),/conflict/);
+});

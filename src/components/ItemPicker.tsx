@@ -1,3 +1,4 @@
+import { ItemJump, useItemAccess } from './ItemAccess';
 import { createPortal } from 'react-dom';
 import { useEffect, useLayoutEffect, useId, useRef, useState, type CSSProperties } from 'react';
 import { isDefenseItem, type Item } from '../lib/catalog';
@@ -6,6 +7,7 @@ import { isDefenseItem, type Item } from '../lib/catalog';
 export function ItemPicker({ items, value, onChange, label, placeholder = 'Search an item…' }: {
   items: Item[]; value: string; onChange: (value: string) => void; label: string; placeholder?: string;
 }) {
+  const itemActions = useItemAccess();
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
   const listId = useId();
@@ -41,9 +43,9 @@ export function ItemPicker({ items, value, onChange, label, placeholder = 'Searc
   }, [open, value, items]);
   function choose(item: Item) { onChange(item.name); setOpen(false); setActive(-1); }
   return <div className="item-picker" onBlur={event => {
-    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) { setOpen(false); setActive(-1); }
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null) && !list.current?.contains(event.relatedTarget as Node | null)) { setOpen(false); setActive(-1); }
   }}>
-    <div className={`item-picker-field ${isDefenseItem(selected) ? 'defense-item' : ''}`}>
+    <div className={`item-picker-field ${isDefenseItem(selected) ? 'defense-item' : ''}`} {...(selected?itemActions.dragProps(selected.id):{})}>
       <input ref={input} role="combobox" aria-label={label} aria-autocomplete="list" aria-expanded={open}
         aria-controls={listId} aria-activedescendant={open && active >= 0 && matches[active] ? `${listId}-${matches[active].id}` : undefined}
         autoComplete="off" title={value || placeholder} value={value} placeholder={placeholder}
@@ -60,15 +62,16 @@ export function ItemPicker({ items, value, onChange, label, placeholder = 'Searc
           } else if (event.key === 'Escape') { event.preventDefault(); setOpen(false); setActive(-1); }
         }}/>
       {selected?.icon && <img src={`${import.meta.env.BASE_URL}${selected.icon}`} alt=""/>}
+      {selected && <ItemJump id={selected.id} name={selected.name}/>}
       <button type="button" tabIndex={-1} aria-label={`Show ${label.toLowerCase()} choices`}
         onMouseDown={event => event.preventDefault()} onClick={() => { if (open) setOpen(false); else { input.current?.focus(); setOpen(true); } }}><span aria-hidden="true">▾</span></button>
     </div>
     {open && createPortal(<div className="item-picker-menu item-picker-floating" style={menuStyle} ref={list} id={listId} role="listbox" aria-label={`${label} choices`}>
-      {matches.map((item, index) => <div key={item.id} id={`${listId}-${item.id}`} role="option"
-        aria-selected={active === index}
+      {matches.map((item, index) => <div key={item.id} id={`${listId}-${item.id}`} role="option" tabIndex={-1}
+        aria-selected={active === index} {...itemActions.dragProps(item.id)}
         className={`item-picker-option ${active === index ? 'highlighted' : ''} ${isDefenseItem(item) ? 'defense-item' : ''}`}
-        onMouseDown={event => event.preventDefault()} onClick={() => choose(item)}>
-        <span>{item.name}</span>{item.icon && <img src={`${import.meta.env.BASE_URL}${item.icon}`} alt=""/>}
+        onClick={() => choose(item)}>
+        <span>{item.name}</span><ItemJump id={item.id} name={item.name}/>{item.icon && <img src={`${import.meta.env.BASE_URL}${item.icon}`} alt=""/>}
       </div>)}
       {!matches.length && <p className="item-picker-empty" role="status">No matching items.</p>}
     </div>, document.body)}

@@ -1,3 +1,4 @@
+import { ItemAccess, ItemJump, useItemAccess } from './ItemAccess';
 import { SystemGraph, VisualizeIcon } from './SystemGraph';
 import { AutoTextarea } from './AutoTextarea';
 import { LogisticsArrow } from './LogisticsArrow';
@@ -12,6 +13,7 @@ import { ItemPicker } from './ItemPicker';
 function TradeList({ direction, entries, items, sections, onChange, collapsible = false }: {
   collapsible?: boolean; direction: 'imports' | 'exports'; entries: TradeEntry[]; items: Item[]; sections: DesignSection[]; onChange: (entries: TradeEntry[]) => void;
 }) {
+  const itemActions = useItemAccess();
   const [expandedEntries, setExpandedEntries] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
   const [message, setMessage] = useState('');
@@ -38,11 +40,12 @@ function TradeList({ direction, entries, items, sections, onChange, collapsible 
     <div className="trade-entries">{orderedEntries.map(entry => {
       const item = lookup.get(entry.itemId);
       return <div className="trade-entry" key={entry.id}>
+        <div className="input-access-row" {...itemActions.dragProps(entry.itemId)}>
         <button type="button" className={`trade-item-heading trade-entry-toggle ${isDefenseItem(item) ? 'defense-item' : ''}`} aria-expanded={!collapsible || expandedEntries.has(entry.id)} disabled={!collapsible} onClick={() => setExpandedEntries(current => { const next = new Set(current); if(next.has(entry.id))next.delete(entry.id);else next.add(entry.id);return next; })}>
           {item?.icon && <img className="item-icon" src={`${import.meta.env.BASE_URL}${item.icon}`} alt=""/>}
           <strong>{item?.name ?? `Item ${entry.itemId}`}</strong>
           {collapsible && <span className="trade-entry-chevron" aria-hidden="true">{expandedEntries.has(entry.id) ? '▾' : '▸'}</span>}
-        </button>
+        </button><ItemJump id={entry.itemId} name={item?.name}/></div>
         {(!collapsible || expandedEntries.has(entry.id)) && <div className="trade-entry-options"><div className="trade-quantity">
           <label>Amount<input aria-label={`${item?.name} ${direction} amount`} type="number" min="0" step="any" placeholder="Optional" value={entry.amount} onChange={e => { if (e.target.value === '' || Number(e.target.value) >= 0) patch(entry.id, { amount: e.target.value }); }}/></label>
           <label>Unit<select aria-label={`${item?.name} ${direction} unit`} value={entry.unit} onChange={e => patch(entry.id, { unit: e.target.value as TradeEntry['unit'] })}><option>items/min</option><option>items/s</option><option>items</option></select></label>
@@ -65,7 +68,7 @@ function PlanetTradeSummary({ entries, direction, items }: {
       const item = items.get(entry.itemId);
       return <span key={entry.id} className={`planet-trade-row ${isDefenseItem(item) ? 'defense-item' : ''}`}>
         {item?.icon && <img className="item-icon" src={`${import.meta.env.BASE_URL}${item.icon}`} alt=""/>}
-        <span className="planet-trade-name">{item?.name ?? `Item ${entry.itemId}`}</span>
+        <ItemAccess id={entry.itemId} name={item?.name}><span className="planet-trade-name">{item?.name ?? `Item ${entry.itemId}`}</span></ItemAccess>
         <span className="planet-trade-arrow" aria-hidden="true">
           <LogisticsArrow direction={direction}/>
         </span>

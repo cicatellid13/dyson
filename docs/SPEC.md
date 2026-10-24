@@ -155,3 +155,8 @@ Import/export item pickers use custom dark menus with item names on the left and
 - Visualize uses an immediate custom tooltip on hover and keyboard focus. Planet spheres are neutral charcoal with a faint highlight, without hue variation.
 
 - On planet pages, each import/export item starts collapsed to its icon and name. Its heading toggles amount, unit, route and removal controls independently. Returning to a planet resets collapsed state; system-level lists remain expanded.
+
+## Consistent item interactions and Favorites ordering
+- Item appearances in recipes (including nested inputs/outputs), production chains, facility lists, catalog rows and logistics cargo provide direct navigation arrows and support dragging into Favorites. Direct navigation does not toggle expandable inputs.
+- Favorites rows can be dragged into a saved order; preserve that order through sync, merge independent membership changes, and surface incompatible concurrent reorder conflicts. Alphabetical catalog sorting does not apply to Favorites.
+- Entering Favorites without a previously chosen favorite shows a neutral selection prompt rather than inheriting Processor or another catalog selection. Removing the selected favorite clears its detail pane.

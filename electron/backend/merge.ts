@@ -22,8 +22,16 @@ export function mergeValue(base: unknown, local: unknown, remote: unknown): unkn
 export function mergeWorkspace(base: Workspace, local: Workspace, remote: Workspace): Workspace {
   const b = encode(base), l = encode(local), r = encode(remote);
   // Favorites are independent membership toggles, so unrelated changes combine.
-  const favorites = [...new Set([...b.favorites, ...l.favorites, ...r.favorites])].filter(id =>
+  const membership = [...new Set([...b.favorites, ...l.favorites, ...r.favorites])].filter(id =>
     l.favorites.includes(id) === b.favorites.includes(id) ? r.favorites.includes(id) : l.favorites.includes(id));
+  const baseCommon = b.favorites.filter(id=>l.favorites.includes(id));
+  const localCommon = l.favorites.filter(id=>b.favorites.includes(id));
+  const remoteCommon = r.favorites.filter(id=>baseCommon.includes(id));
+  const localReordered = !same(baseCommon,localCommon);
+  const remoteReordered = !same(b.favorites.filter(id=>r.favorites.includes(id)),r.favorites.filter(id=>b.favorites.includes(id)));
+  if(localReordered && remoteReordered && !same(localCommon.filter(id=>r.favorites.includes(id)),remoteCommon))throw Error('conflict');
+  const preferred = localReordered ? l.favorites : remoteReordered ? r.favorites : membership;
+  const favorites = [...new Set([...preferred,...membership])].filter(id=>membership.includes(id));
   const merged = mergeValue({ ...b, favorites: [] }, { ...l, favorites: [] }, { ...r, favorites: [] }) as StoredData;
   return decode({ ...merged, favorites });
 }
