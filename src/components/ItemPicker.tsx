@@ -1,4 +1,4 @@
-import { ItemJump, useItemAccess } from './ItemAccess';
+import { useItemAccess } from './ItemAccess';
 import { createPortal } from 'react-dom';
 import { useEffect, useLayoutEffect, useId, useRef, useState, type CSSProperties } from 'react';
 import { isDefenseItem, type Item } from '../lib/catalog';
@@ -62,7 +62,6 @@ export function ItemPicker({ items, value, onChange, label, placeholder = 'Searc
           } else if (event.key === 'Escape') { event.preventDefault(); setOpen(false); setActive(-1); }
         }}/>
       {selected?.icon && <img src={`${import.meta.env.BASE_URL}${selected.icon}`} alt=""/>}
-      {selected && <ItemJump id={selected.id} name={selected.name}/>}
       <button type="button" tabIndex={-1} aria-label={`Show ${label.toLowerCase()} choices`}
         onMouseDown={event => event.preventDefault()} onClick={() => { if (open) setOpen(false); else { input.current?.focus(); setOpen(true); } }}><span aria-hidden="true">▾</span></button>
     </div>
@@ -71,7 +70,7 @@ export function ItemPicker({ items, value, onChange, label, placeholder = 'Searc
         aria-selected={active === index} {...itemActions.dragProps(item.id)}
         className={`item-picker-option ${active === index ? 'highlighted' : ''} ${isDefenseItem(item) ? 'defense-item' : ''}`}
         onClick={() => choose(item)}>
-        <span>{item.name}</span><ItemJump id={item.id} name={item.name}/>{item.icon && <img src={`${import.meta.env.BASE_URL}${item.icon}`} alt=""/>}
+        <span>{item.name}</span>{item.icon && <img src={`${import.meta.env.BASE_URL}${item.icon}`} alt=""/>}
       </div>)}
       {!matches.length && <p className="item-picker-empty" role="status">No matching items.</p>}
     </div>, document.body)}

@@ -160,3 +160,13 @@ Import/export item pickers use custom dark menus with item names on the left and
 - Item appearances in recipes (including nested inputs/outputs), production chains, facility lists, catalog rows and logistics cargo provide direct navigation arrows and support dragging into Favorites. Direct navigation does not toggle expandable inputs.
 - Favorites rows can be dragged into a saved order; preserve that order through sync, merge independent membership changes, and surface incompatible concurrent reorder conflicts. Alphabetical catalog sorting does not apply to Favorites.
 - Entering Favorites without a previously chosen favorite shows a neutral selection prompt rather than inheriting Processor or another catalog selection. Removing the selected favorite clears its detail pane.
+
+- Planet export routes preselect and lock the system selector to that planet’s parent system. Destination planet choices are limited to that system. Existing out-of-system routes are preserved with a warning until the user chooses a replacement; imports and system-level routes retain their selectors.
+
+- Import/export lists omit the empty-list helper text. Adding an item automatically expands that new entry’s options; existing entries keep their expansion state.
+
+- Planet import source choices exclude the current planet. Existing self-referencing imports prompt for a replacement without silently rewriting saved routes.
+
+- Export destination choices also exclude the current planet; neither import nor export routes can select their own planet in the picker.
+
+- Logistics item dropdowns show item names and icons without direct-navigation arrows, including the selected item field. Dragging items to Favorites remains available; existing cargo rows retain their navigation arrows.
