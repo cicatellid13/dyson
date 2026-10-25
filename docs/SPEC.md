@@ -186,3 +186,20 @@ Import/export item pickers use custom dark menus with item names on the left and
 - Each icon navigates to its item detail below the grid, displays its name on hover, and supports dragging to Favorites. Search and Dark Fog filtering apply without shifting grid positions; hidden items leave empty cells.
 - A Default to grid toggle persists in the shared workspace using a small database update. Returning to All items or restarting uses the saved default; temporary view switching does not change it. Existing workspaces default to List.
 - Grid width is capped at 920px with icons up to 52px to keep it compact on wide windows; narrow windows retain horizontal scrolling.
+
+## Session expansion memory
+- Planning folders and Scratch pad, Logistics systems, and individual import/export options retain their expanded/collapsed state when navigating away and back, including switching planets.
+- Expansion is kept only in renderer memory. It is not saved to local storage or MongoDB, is not shared across machines, and resets when the app restarts. New sessions start collapsed; existing create/open behaviors can still expand relevant entries.
+- Returning to Planning restores the selected note/folder; returning to Logistics restores the selected system/planet and graph view. Selection uses the same session-only lifetime as expansion, never syncing or persisting to disk.
+
+## Linked routes, specializations and checklists
+- An export to another planet in the same system offers Create / link matching import. Pairing is explicit, uses a stable link ID, and reuses an exact existing counterpart. Separate routes with different amounts are preserved.
+- Edits from either side update the paired item, amount, unit and endpoints in one workspace update. Moving an endpoint moves its counterpart; clearing it removes the mirror and unlinks the remaining entry. Removing a linked entry removes both sides, explained beside the entry. Legacy unlinked routes retain their behavior. Linked route endpoints remain within their system.
+- Planets support up to 12 specialization tags (40 characters each), with suggestions and custom names. Tags appear on system cards and graph nodes/details and sync with the planet.
+- Planning notes retain their free text and optionally contain an autosaved checklist of editable tasks. Users can add, check and remove tasks. Completed/total progress appears in the editor and beside notes. Existing notes need no migration.
+- The checklist UI is labeled To-do. Its compact Clear completed button removes only completed tasks from the current note, autosaves, and is disabled when there are no completed tasks.
+
+## Startup updates and cursor
+- Packaged Windows checks for an update before opening the editable workspace. If downloaded within 30 seconds, install silently and relaunch automatically; failures/timeouts open the app and leave later installation for normal exit so active editing is not interrupted.
+- When a startup download is identified, show Updating to version [version] in a dark notice with only OK. The notice closes automatically after five seconds; dismissing it does not cancel the update. Closing the notice must not quit startup.
+- Use a bundled cyan/purple triangular cursor with a subtle luminous rim; text fields retain the text caret and disabled buttons retain their unavailable cursor.

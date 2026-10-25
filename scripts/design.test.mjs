@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 const compiled = ts.transpileModule(readFileSync(new URL('../src/lib/design.ts', import.meta.url), 'utf8'), {compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;
-const { createSection, parseDesign, removeSection } = await import('data:text/javascript;base64,' + Buffer.from(compiled).toString('base64'));
+const { createSection, parseDesign, removeSection, linkExport, updateTrades } = await import('data:text/javascript;base64,' + Buffer.from(compiled).toString('base64'));
 test('systems, planets, notes and independent trade lists survive persistence', () => {
  const system = createSection('  Home system  ', 'system');
  const planet = createSection('Forge', 'planet', system.id);
@@ -53,4 +53,28 @@ test('new planets require a system while legacy standalone planets remain recove
  assert.equal(restored.sections[0].notes,'Keep my notes');
  restored.sections.push(system);restored.sections[0].parentId=system.id;
  assert.equal(parseDesign(JSON.stringify(restored)).sections[0].parentId,system.id);
+});
+test('linked exports create one counterpart, sync both ways, move, and remove atomically',()=>{
+ const system=createSection('System','system'), a=createSection('A','planet',system.id), b=createSection('B','planet',system.id), c=createSection('C','planet',system.id);
+ a.exports=[{id:'route',itemId:1303,amount:'120',unit:'items/min',destination:'',planetId:b.id}];
+ let data={version:1,sections:[system,a,b,c]};
+ data=linkExport(data,a.id,'route');
+ const find=id=>data.sections.find(s=>s.id===id);
+ assert.equal(find(b.id).imports.length,1);assert.equal(find(b.id).imports[0].planetId,a.id);
+ data=linkExport(data,a.id,'route');assert.equal(find(b.id).imports.length,1);
+ data=updateTrades(data,b.id,'imports',find(b.id).imports.map(e=>({...e,amount:'240'})));
+ assert.equal(find(a.id).exports[0].amount,'240');
+ data=updateTrades(data,a.id,'exports',find(a.id).exports.map(e=>({...e,planetId:c.id})));
+ assert.equal(find(b.id).imports.length,0);assert.equal(find(c.id).imports[0].amount,'240');
+ assert.deepEqual(parseDesign(JSON.stringify(data)),data);
+ data=updateTrades(data,c.id,'imports',[]);assert.equal(find(a.id).exports.length,0);
+});
+test('linking preserves unrelated planned imports and reuses exact matches',()=>{
+ const system=createSection('System','system'),a=createSection('A','planet',system.id),b=createSection('B','planet',system.id);
+ a.specializations=['Science','Smelting'];
+ a.exports=[{id:'export',itemId:1303,amount:'120',unit:'items/min',destination:'',planetId:b.id}];
+ b.imports=[{...a.exports[0],id:'existing',planetId:a.id}];
+ const data=linkExport({version:1,sections:[system,a,b]},a.id,'export');
+ assert.equal(data.sections[2].imports.length,1);assert.equal(data.sections[2].imports[0].id,'existing');
+ assert.deepEqual(parseDesign(JSON.stringify(data)).sections[1].specializations,['Science','Smelting']);
 });

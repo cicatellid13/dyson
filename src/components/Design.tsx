@@ -1,3 +1,6 @@
+import { linkExport, updateTrades } from '../lib/design';
+import { PlanetTags, Specializations } from './Specializations';
+import { useSessionExpansion, useSessionSelection } from '../lib/sessionExpansion';
 import { ThemedSelect } from './ThemedSelect';
 import { ItemAccess, ItemJump, useItemAccess } from './ItemAccess';
 import { SystemGraph, VisualizeIcon } from './SystemGraph';
@@ -15,7 +18,7 @@ function TradeList({ direction, entries, items, sections, onChange, collapsible 
   currentPlanetId?: string; exportSystemId?: string; collapsible?: boolean; direction: 'imports' | 'exports'; entries: TradeEntry[]; items: Item[]; sections: DesignSection[]; onChange: (entries: TradeEntry[]) => void;
 }) {
   const itemActions = useItemAccess();
-  const [expandedEntries, setExpandedEntries] = useState<Set<string>>(new Set());
+  const [expandedEntries, setExpandedEntries] = useSessionExpansion('logistics-entries');
   const [search, setSearch] = useState('');
   const [message, setMessage] = useState('');
   const label = direction === 'imports' ? 'Imports' : 'Exports';
@@ -52,7 +55,9 @@ function TradeList({ direction, entries, items, sections, onChange, collapsible 
           <label>Amount<input aria-label={`${item?.name} ${direction} amount`} type="number" min="0" step="any" placeholder="Optional" value={entry.amount} onChange={e => { if (e.target.value === '' || Number(e.target.value) >= 0) patch(entry.id, { amount: e.target.value }); }}/></label>
           <label>Unit<ThemedSelect aria-label={`${item?.name} ${direction} unit`} value={entry.unit} onChange={e => patch(entry.id, { unit: e.target.value as TradeEntry['unit'] })}><option>items/min</option><option>items/s</option><option>items</option></ThemedSelect></label>
         </div>
-        <PlanetPicker excludedPlanetId={currentPlanetId} lockedSystemId={direction==='exports'?exportSystemId:undefined} sections={sections} planetId={entry.planetId} legacyName={entry.destination} label={`${item?.name} ${direction}`} direction={direction === 'imports' ? 'From' : 'To'} onChange={planetId => patch(entry.id, { planetId, destination: '' })}/>
+        <PlanetPicker excludedPlanetId={currentPlanetId} lockedSystemId={direction==='exports'?exportSystemId:entry.linkId?sections.find(s=>s.id===currentPlanetId)?.parentId??undefined:undefined} sections={sections} planetId={entry.planetId} legacyName={entry.destination} label={`${item?.name} ${direction}`} direction={direction === 'imports' ? 'From' : 'To'} onChange={planetId => patch(entry.id, { planetId, destination: '' })}/>
+        {currentPlanetId && direction==='exports' && !entry.linkId && sections.some(s=>s.id===entry.planetId&&s.parentId===exportSystemId&&s.id!==currentPlanetId) && <button className="design-button" onClick={()=>updateWorkspace(current=>({...current,design:linkExport(current.design,currentPlanetId,entry.id)}))}>Create / link matching import</button>}
+        {entry.linkId && <p className="note">Linked route · Changes sync to the other planet. Removing this item removes both sides.</p>}
         <button type="button" className="design-remove trade-entry-remove" aria-label={`Remove ${item?.name ?? 'item'} from ${direction}`} onClick={() => onChange(entries.filter(e => e.id !== entry.id))}>Remove item</button>
         </div>}
       </div>;
@@ -97,7 +102,7 @@ function PlanetCard({ planet, items, onOpen }: { planet: DesignSection; items: M
   const exports = planet.exports.filter(entry => items.has(entry.itemId) && (!selected || entry.itemId === selected));
   const visibleCount = (direction !== 'exports' ? imports.length : 0) + (direction !== 'imports' ? exports.length : 0);
   return <article className="planet-card" aria-label={`${planet.name} trade overview`}>
-    <button className="planet-card-open" onClick={onOpen} aria-label={`Open ${planet.name}`}><span aria-hidden="true">◉</span><strong>{planet.name || 'Unnamed planet'}</strong>{planet.planetType && <small className="planet-type-label">{planet.planetType}</small>}<span className="planet-open-hint">Open planet ↗</span></button>
+    <button className="planet-card-open" onClick={onOpen} aria-label={`Open ${planet.name}`}><span aria-hidden="true">◉</span><strong>{planet.name || 'Unnamed planet'}</strong>{planet.planetType && <small className="planet-type-label">{planet.planetType}</small>}<PlanetTags tags={planet.specializations}/><span className="planet-open-hint">Open planet ↗</span></button>
     <div className="planet-card-filters">
       <div className="logistics-filter"><span className="logistics-filter-label">Logistics</span><div className="logistics-bubbles" role="group" aria-label={`${planet.name} logistics filter`}>
         {(['imports', 'exports'] as const).map(value => <button key={value} type="button" className={`logistics-bubble ${value}`} aria-label={`${planet.name} ${value} filter`} aria-pressed={direction === value} onClick={() => changeDirection(value)}>
@@ -120,13 +125,13 @@ export function Design({ catalog }: { catalog: Catalog }) {
   const data = cloud.view.data.design;
   const saveError = cloud.error;
   const initial = { data, error: '' };
-  const [graphSystem, setGraphSystem] = useState<string | null>(null);
-  const [activeId, setActiveId] = useState<string | null>(initial.data.sections[0]?.id ?? null);
+  const [graphSystem, setGraphSystem] = useSessionSelection('logistics-graph');
+  const [activeId, setActiveId] = useSessionSelection('logistics-location', initial.data.sections[0]?.id ?? null);
   const [creation, setCreation] = useState<{kind: DesignSection['kind']; parentId: string | null; placement: 'sidebar' | 'inline'} | null>(null);
   const [name, setName] = useState('');
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [undo, setUndo] = useState<{data: DesignData; activeId: string | null; kind: 'planet' | 'system'} | null>(null);
-  const [expandedSystems, setExpandedSystems] = useState<Set<string>>(new Set());
+  const [expandedSystems, setExpandedSystems] = useSessionExpansion('logistics-systems');
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   function expandSystem(id: string) { setExpandedSystems(current => new Set([...current,id])); }
@@ -195,10 +200,11 @@ export function Design({ catalog }: { catalog: Catalog }) {
         <div className="system-name-row"><label className="design-name">Name<input aria-label="Section name" value={active.name} maxLength={120} onChange={e => patch({name: e.target.value})} onBlur={() => { if (!active.name.trim()) patch({name: active.kind === 'planet' ? 'Untitled planet' : 'Untitled system'}); }}/></label>{active.kind === 'system' && <button className={`visualize-button ${graphSystem===active.id?'active':''}`} data-tooltip="visualize" aria-label={`Visualize ${active.name}`} aria-pressed={graphSystem===active.id} onClick={()=>setGraphSystem(graphSystem===active.id?null:active.id)}><VisualizeIcon/></button>}</div>
         {active.kind==='system' && graphSystem===active.id ? <SystemGraph key={active.id} planets={children} items={itemLookup} onClose={()=>setGraphSystem(null)}/> : <>
         {active.kind === 'planet' && <label className="design-planet-type">Planet type<input aria-label="Planet type" value={active.planetType ?? ''} maxLength={120} placeholder="e.g. Lava, Ocean, Gas giant" onChange={event => patch({planetType:event.target.value})}/></label>}
+        {active.kind === 'planet' && <Specializations key={active.id} tags={active.specializations??[]} onChange={specializations=>patch({specializations})}/>}
         {active.kind === 'planet' && !parent && <div className="design-assignment"><label>Assign to a system<ThemedSelect aria-label="Assign planet to system" value="" onChange={event => { if (roots.some(system => system.id === event.target.value)) patch({parentId: event.target.value}); }}><option value="">Select a system</option>{roots.map(system => <option key={system.id} value={system.id}>{system.name}</option>)}</ThemedSelect></label>{!roots.length && <p className="design-empty-small">Create a system using + System, then assign this planet here. Your notes and routes are preserved.</p>}</div>}
         {active.kind === 'system' && <section className="design-planets"><div className="design-section-heading"><h3>Planets in this system</h3><button className="design-button" onClick={() => begin('planet', active.id)}>+ Add planet</button></div>{creation?.kind === 'planet' && creation.placement === 'inline' && creation.parentId === active.id && <form className="design-create-form design-inline-create" onSubmit={add}><h3>Add planet to {active.name}</h3><label>Planet name<input autoFocus aria-label="New planet name" value={name} maxLength={120} placeholder="e.g. Homeworld" onChange={event => setName(event.target.value)}/></label><div><button className="design-button" type="submit" disabled={!name.trim()}>Create planet</button><button type="button" onClick={() => setCreation(null)}>Cancel</button></div></form>}<div className="design-planet-cards">{children.map(child => <PlanetCard key={`${child.id}-${catalog.items.length}`} planet={child} items={itemLookup} onOpen={() => navigate(child.id)}/>)}</div>{!children.length && <p className="design-empty-small">Add a planet to start mapping this system.</p>}</section>}
         <label className="design-notes">Notes<AutoTextarea aria-label="Section notes" placeholder="Resources, production goals, construction plans…" value={active.notes} onChange={e => patch({notes: e.target.value})}/></label>
-        <div className="design-trade-grid"><TradeList currentPlanetId={active.kind==='planet'?active.id:undefined} collapsible={active.kind==='planet'} key={`imports-${catalog.items.length}`} direction="imports" entries={active.imports} items={catalog.items} sections={data.sections} onChange={imports => patch({imports})}/><TradeList currentPlanetId={active.kind==='planet'?active.id:undefined} exportSystemId={active.kind==='planet' ? active.parentId ?? undefined : undefined} collapsible={active.kind==='planet'} key={`exports-${catalog.items.length}`} direction="exports" entries={active.exports} items={catalog.items} sections={data.sections} onChange={exports => patch({exports})}/></div>
+        <div className="design-trade-grid"><TradeList currentPlanetId={active.kind==='planet'?active.id:undefined} collapsible={active.kind==='planet'} key={`imports-${catalog.items.length}`} direction="imports" entries={active.imports} items={catalog.items} sections={data.sections} onChange={imports => updateWorkspace(current=>({...current,design:updateTrades(current.design,active.id,'imports',imports)}))}/><TradeList currentPlanetId={active.kind==='planet'?active.id:undefined} exportSystemId={active.kind==='planet' ? active.parentId ?? undefined : undefined} collapsible={active.kind==='planet'} key={`exports-${catalog.items.length}`} direction="exports" entries={active.exports} items={catalog.items} sections={data.sections} onChange={exports => updateWorkspace(current=>({...current,design:updateTrades(current.design,active.id,'exports',exports)}))}/></div>
         {active.kind === 'system' && <p className="note">These lists describe this system. Each planet keeps its own notes and trade lists; they are not automatically combined.</p>}
         <div className="design-delete-area">{deleteId === active.id ? <div role="alert"><p>Delete “{active.name}”{active.kind === 'system' ? ` and its ${children.length} planets` : ''}, including all notes and lists?</p><button className="design-button danger" onClick={confirmRemove}>Delete {active.kind}</button><button onClick={() => setDeleteId(null)}>Cancel</button></div> : <button className="design-remove" onClick={() => setDeleteId(active.id)}>Delete {active.kind}</button>}</div>
         </>}

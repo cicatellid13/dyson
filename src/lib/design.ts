@@ -1,6 +1,7 @@
 export const DESIGN_KEY = 'dsp-design-v1';
 export type TradeEntry = {
   id: string;
+  linkId?: string;
   itemId: number;
   amount: string;
   unit: 'items/min' | 'items/s' | 'items';
@@ -14,6 +15,7 @@ export type DesignSection = {
   name: string;
   notes: string;
   planetType?: string;
+  specializations?: string[];
   order?: number;
   imports: TradeEntry[];
   exports: TradeEntry[];
@@ -37,10 +39,11 @@ export function parseDesign(raw: string | null): DesignData {
     if (!s || typeof s.id !== 'string' || ids.has(s.id) || !['planet', 'system'].includes(s.kind) ||
       typeof s.name !== 'string' || typeof s.notes !== 'string' || (s.parentId !== null && typeof s.parentId !== 'string')) throw Error('Invalid design section.');
     if (s.planetType !== undefined && (typeof s.planetType !== 'string' || s.planetType.length > 120)) throw Error('Invalid planet type.');
+    if (s.specializations !== undefined && (!Array.isArray(s.specializations) || s.specializations.length>12 || s.specializations.some(t=>typeof t!=='string'||!t.trim()||t.length>40))) throw Error('Invalid specializations.');
     if (s.order !== undefined && !Number.isFinite(s.order)) throw Error('Invalid section order.');
     ids.add(s.id);
     for (const list of [s.imports, s.exports]) {
-      if (!Array.isArray(list) || list.some(e => !e || typeof e.id !== 'string' || !Number.isInteger(e.itemId) || typeof e.amount !== 'string' ||
+      if (!Array.isArray(list) || list.some(e => !e || typeof e.id !== 'string' || (e.linkId !== undefined && typeof e.linkId !== 'string') || !Number.isInteger(e.itemId) || typeof e.amount !== 'string' ||
         !['items/min', 'items/s', 'items'].includes(e.unit) || typeof e.destination !== 'string' || (e.planetId !== undefined && e.planetId !== null && typeof e.planetId !== 'string'))) throw Error('Invalid import/export list.');
     }
   }
@@ -61,4 +64,35 @@ export function reorderSections(data: DesignData, source: string, target: string
   siblings.splice(fromIndex,1); siblings.splice(toIndex,0,from);
   const ranks = new Map(siblings.map((section,index) => [section.id,index]));
   return { ...data, sections:data.sections.map(s => ranks.has(s.id) ? {...s,order:ranks.get(s.id)!} : s) };
+}
+
+/** Keep explicitly paired routes in one workspace update, never infer links for legacy entries. */
+export function updateTrades(data: DesignData, ownerId: string, direction: 'imports'|'exports', entries: TradeEntry[]): DesignData {
+  const owner = data.sections.find(s=>s.id===ownerId);
+  if (!owner) return data;
+  const opposite = direction==='exports'?'imports':'exports';
+  let sections = data.sections.map(s=>s.id===ownerId?{...s,[direction]:entries}:s);
+  for (const old of owner[direction]) {
+    if (!old.linkId) continue;
+    const next = entries.find(e=>e.id===old.id);
+    if (next && next.itemId===old.itemId && next.amount===old.amount && next.unit===old.unit && next.planetId===old.planetId && next.linkId===old.linkId) continue;
+    const target = sections.find(s=>s.id===next?.planetId && s.kind==='planet' && s.id!==ownerId);
+    const partner = data.sections.flatMap(s=>s[opposite]).find(e=>e.linkId===old.linkId);
+    sections = sections.map(s=>({...s,[opposite]:s[opposite].filter(e=>e.linkId!==old.linkId)}));
+    if (next && target) {
+      const mirror: TradeEntry = {...next,id:partner?.id??crypto.randomUUID(),planetId:ownerId,destination:''};
+      sections = sections.map(s=>s.id===target.id?{...s,[opposite]:[...s[opposite],mirror]}:s);
+    } else if(next) sections=sections.map(s=>s.id===ownerId?{...s,[direction]:s[direction].map(e=>e.id===next.id?{...e,linkId:undefined}:e)}:s);
+  }
+  return {...data,sections};
+}
+export function linkExport(data: DesignData, ownerId: string, entryId: string): DesignData {
+  const owner=data.sections.find(s=>s.id===ownerId&&s.kind==='planet');
+  const entry=owner?.exports.find(e=>e.id===entryId);
+  const target=data.sections.find(s=>s.id===entry?.planetId&&s.kind==='planet');
+  if(!owner||!entry||entry.linkId||!target||target.id===owner.id||target.parentId!==owner.parentId)return data;
+  // Reuse only an exact counterpart; never overwrite a separately planned rate.
+  const match=target.imports.find(e=>!e.linkId&&e.itemId===entry.itemId&&e.planetId===owner.id&&e.amount===entry.amount&&e.unit===entry.unit);
+  const linkId=crypto.randomUUID();
+  return {...data,sections:data.sections.map(s=>s.id===owner.id?{...s,exports:s.exports.map(e=>e.id===entryId?{...e,linkId}:e)}:s.id===target.id?{...s,imports:match?s.imports.map(e=>e.id===match.id?{...e,linkId}:e):[...s.imports,{...entry,id:crypto.randomUUID(),linkId,planetId:owner.id,destination:''}]}:s)};
 }

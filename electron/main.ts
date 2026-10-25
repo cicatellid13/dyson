@@ -5,7 +5,7 @@ import { Database } from './backend/database';
 import { Persistence } from './backend/persistence';
 import { validateWorkspace } from '../src/lib/workspace';
 import { autoUpdater } from 'electron-updater';
-import { startUpdates } from './backend/updates';
+import { startUpdates, updateBeforeOpening } from './backend/updates';
 import bundled from '../public/data/catalog.json';
 import type { Catalog } from '../src/lib/catalog';
 
@@ -54,5 +54,20 @@ function createWindow(){
   if(devServerUrl&&!app.isPackaged) void win.loadURL(devServerUrl);
   else void win.loadFile(path.join(__dirname,'../dist/index.html'));
 }
-if (hasInstanceLock) app.whenReady().then(()=>{setInterval(()=>{void persistence?.sync();},30000).unref();createWindow();startUpdates(autoUpdater, { packaged: app.isPackaged, platform: process.platform });app.on('activate',()=>{if(!BrowserWindow.getAllWindows().length)createWindow();});});
-app.on('window-all-closed',()=>{if(process.platform!=='darwin')app.quit();});
+let starting = true;
+function showUpdateNotice(version: string) {
+  const notice=new BrowserWindow({width:390,height:155,resizable:false,alwaysOnTop:true,autoHideMenuBar:true,title:'DSP Fieldguide',backgroundColor:'#101719',webPreferences:{nodeIntegration:false,contextIsolation:true,sandbox:true}});
+  const safeVersion=version.replace(/[^a-zA-Z0-9.+-]/g,'');
+  void notice.loadURL('data:text/html;charset=utf-8,'+encodeURIComponent(`<html><body style="margin:0;padding:22px;background:#101719;color:#dfe7e9;font:14px system-ui;text-align:center"><p>Updating to version ${safeVersion}</p><button onclick="window.close()" style="background:#294238;border:1px solid #486353;border-radius:5px;color:#dfe7e9;padding:7px 30px;cursor:pointer">OK</button><script>setTimeout(()=>window.close(),5000)</script></body></html>`));
+  setTimeout(()=>{if(!notice.isDestroyed())notice.close();},5500).unref();
+}
+if (hasInstanceLock) app.whenReady().then(async()=>{
+  setInterval(()=>{void persistence?.sync();},30000).unref();
+  const installed=await updateBeforeOpening(autoUpdater,{packaged:app.isPackaged,platform:process.platform},showUpdateNotice);
+  if(installed)return;
+  starting=false;createWindow();
+  // The startup check already ran; background checks resume on their normal cadence.
+  startUpdates(autoUpdater, { packaged: app.isPackaged, platform: process.platform }, undefined, false);
+  app.on('activate',()=>{if(!BrowserWindow.getAllWindows().length)createWindow();});
+});
+app.on('window-all-closed',()=>{if(!starting&&process.platform!=='darwin')app.quit();});

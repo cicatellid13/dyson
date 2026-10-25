@@ -143,3 +143,14 @@ test('catalog default view merges with unrelated workspace changes and persists 
  assert.equal(merged.defaultCatalogView,'grid');assert.deepEqual(merged.favorites,[1303]);
  assert.deepEqual(workspacePatch(encode(base),encode(local)).set,{'data.defaultCatalogView':'grid'});
 });
+test('checklist tasks and specializations survive storage and merge independent edits',()=>{
+ const base=fixture();
+ base.planning.notes=[{id:'note',folderId:null,title:'Build',body:'Keep this text',checklist:[{id:'task',text:'Build smelters',done:false}]}];
+ const local=copy(base),remote=copy(base);
+ local.planning.notes[0].checklist![0].done=true;
+ remote.design.sections[0].notes='Other change';
+ const merged=mergeWorkspace(base,local,remote);
+ assert.equal(merged.planning.notes[0].checklist![0].done,true);
+ assert.equal(merged.planning.notes[0].body,'Keep this text');
+ assert.equal(merged.design.sections[0].notes,'Other change');
+});

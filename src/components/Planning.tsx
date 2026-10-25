@@ -1,3 +1,5 @@
+import { NoteChecklist } from './NoteChecklist';
+import { useSessionExpansion, useSessionSelection } from '../lib/sessionExpansion';
 import { ThemedSelect } from './ThemedSelect';
 import { useState } from 'react';
 import { useWorkspace, updateWorkspace } from '../lib/persistence';
@@ -12,13 +14,13 @@ function PlanningIcon({ folder = false }: { folder?: boolean }) {
 export function Planning() {
   const cloud = useWorkspace();
   const data = cloud.view.data.planning;
-  const [noteId, setNoteId] = useState<string | null>(null);
-  const [folderId, setFolderId] = useState<string | null>(null);
+  const [noteId, setNoteId] = useSessionSelection('planning-note');
+  const [folderId, setFolderId] = useSessionSelection('planning-folder');
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [folderName, setFolderName] = useState('');
   const [deleting, setDeleting] = useState<{ kind: 'folder' | 'note'; id: string } | null>(null);
   const [undo, setUndo] = useState<{ data: PlanningData; label: string } | null>(null);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [expanded, setExpanded] = useSessionExpansion('planning-folders');
   const [dragging, setDragging] = useState<{kind: 'folder' | 'note'; id: string} | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   function expand(id: string) { setExpanded(current => new Set([...current, id])); }
@@ -82,7 +84,7 @@ export function Planning() {
     setUndo(null);
   }
   function noteButton(note: PlanningNote) {
-    return <button key={note.id} className={`planning-note-link ${active?.id === note.id ? 'active' : ''} ${dropTarget === note.id ? 'drop-target' : ''}`} {...dragProps('note', note.id)} onClick={() => openNote(note)}><PlanningIcon/><span>{note.title.trim() || 'Untitled note'}</span></button>;
+    return <button key={note.id} className={`planning-note-link ${active?.id === note.id ? 'active' : ''} ${dropTarget === note.id ? 'drop-target' : ''}`} {...dragProps('note', note.id)} onClick={() => openNote(note)}><PlanningIcon/><span>{note.title.trim() || 'Untitled note'}</span>{!!note.checklist?.length&&<small className="checklist-progress">{note.checklist.filter(t=>t.done).length}/{note.checklist.length}</small>}</button>;
   }
   const deleteName = deleting?.kind === 'folder' ? data.folders.find(f => f.id === deleting.id)?.name : data.notes.find(n => n.id === deleting?.id)?.title;
   return <div className="design-workspace planning-workspace">
@@ -104,6 +106,7 @@ export function Planning() {
         <div className="planning-toolbar"><label>Folder<ThemedSelect aria-label="Note folder" value={active.folderId ?? ''} onChange={event => { const id = event.target.value || null; patch({ folderId: id, order: nextOrder(data.notes.filter(n => n.folderId === id)) }); setFolderId(id); expand(id ?? 'scratch-pad'); }}><option value="">Scratch pad</option>{ordered(data.folders).map(f => <option key={f.id} value={f.id}>{f.name || 'Untitled folder'}</option>)}</ThemedSelect></label><button className="design-remove" onClick={() => setDeleting({kind:'note',id:active.id})}>Delete note</button></div>
         <input className="planning-title" aria-label="Note title" placeholder="Untitled note" value={active.title} maxLength={120} onChange={event => patch({title:event.target.value})}/>
         <AutoTextarea className="planning-body" aria-label="Note text" placeholder="Start writing…" value={active.body} onChange={event => patch({body:event.target.value})} spellCheck/>
+        <NoteChecklist entries={active.checklist??[]} onChange={checklist=>patch({checklist})}/>
       </div> : <div className="planning-folder-editor">
         {folder ? <><div className="eyebrow">FOLDER</div><label className="design-name">Folder name<input aria-label="Folder name" maxLength={120} value={folder.name} onChange={event => commit(value => ({ ...value, folders:value.folders.map(f => f.id === folder.id ? {...f,name:event.target.value} : f) }))}/></label><button className="design-remove" onClick={() => setDeleting({kind:'folder',id:folder.id})}>Delete folder</button></> : <h2>Scratch pad</h2>}
         <p className="design-empty-small">{data.notes.some(n => n.folderId === currentFolderId) ? 'Choose a note on the left, or start a new one.' : 'A blank page for your next idea.'}</p>
