@@ -1,3 +1,4 @@
+import { ThemedSelect } from './ThemedSelect';
 import { useState } from 'react';
 import { useWorkspace, updateWorkspace } from '../lib/persistence';
 import { removePlanningFolder, ordered, reorderPlanning, nextScratchTitle, nextOrder, type PlanningData, type PlanningNote } from '../lib/planning';
@@ -100,7 +101,7 @@ export function Planning() {
       {undo && <div className="design-undo" role="status">{undo.label}<button onClick={restore}>Undo</button><button aria-label="Dismiss undo" onClick={() => setUndo(null)}>×</button></div>}
       {deleting && <div className="planning-delete-confirm" role="alert"><p>Delete {deleting.kind} “{deleteName?.trim() || `Untitled ${deleting.kind}`}”{deleting.kind === 'folder' ? ' and all notes inside it' : ''}?</p><button className="design-button danger" onClick={remove}>Delete {deleting.kind}</button><button onClick={() => setDeleting(null)}>Cancel</button></div>}
       {active ? <div key={active.id} className="planning-page">
-        <div className="planning-toolbar"><label>Folder<select aria-label="Note folder" value={active.folderId ?? ''} onChange={event => { const id = event.target.value || null; patch({ folderId: id, order: nextOrder(data.notes.filter(n => n.folderId === id)) }); setFolderId(id); expand(id ?? 'scratch-pad'); }}><option value="">Scratch pad</option>{ordered(data.folders).map(f => <option key={f.id} value={f.id}>{f.name || 'Untitled folder'}</option>)}</select></label><button className="design-remove" onClick={() => setDeleting({kind:'note',id:active.id})}>Delete note</button></div>
+        <div className="planning-toolbar"><label>Folder<ThemedSelect aria-label="Note folder" value={active.folderId ?? ''} onChange={event => { const id = event.target.value || null; patch({ folderId: id, order: nextOrder(data.notes.filter(n => n.folderId === id)) }); setFolderId(id); expand(id ?? 'scratch-pad'); }}><option value="">Scratch pad</option>{ordered(data.folders).map(f => <option key={f.id} value={f.id}>{f.name || 'Untitled folder'}</option>)}</ThemedSelect></label><button className="design-remove" onClick={() => setDeleting({kind:'note',id:active.id})}>Delete note</button></div>
         <input className="planning-title" aria-label="Note title" placeholder="Untitled note" value={active.title} maxLength={120} onChange={event => patch({title:event.target.value})}/>
         <AutoTextarea className="planning-body" aria-label="Note text" placeholder="Start writing…" value={active.body} onChange={event => patch({body:event.target.value})} spellCheck/>
       </div> : <div className="planning-folder-editor">

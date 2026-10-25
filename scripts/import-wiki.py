@@ -80,8 +80,11 @@ def main():
         i['description']=re.sub('<[^>]*>','',i.get('description',''))
         if i.get('mining_from'): i['mining_from']=re.sub('<[^>]*>','',i['mining_from'])
     out=dict(source=SOURCE,revision=revision['revid'],sourceUpdated=revision['timestamp'],downloaded=datetime.datetime.now(datetime.timezone.utc).isoformat(),items=items,recipes=recipes,techs=data['game_techs'],facilities=data['game_facilities'],categories=data['categories'],missingIcons=missing)
+    # Refresh prose together with recipe data so a refresh never drops Overviews.
     temporary=ROOT/'public/data/catalog.json.tmp'
     temporary.write_text(json.dumps(out,ensure_ascii=False,separators=(',',':')))
     temporary.replace(ROOT/'public/data/catalog.json')
     print(f'Imported {len(items)} items, {len(recipes)} recipes, {len(icons)} icons. Missing: {missing}')
-if __name__=='__main__': main()
+if __name__=='__main__':
+    main()
+    subprocess.run(['python3', str(ROOT/'scripts/import-overviews.py')], check=True)

@@ -23,7 +23,16 @@ export class Database {
     // _id indexes exist automatically. A single immutable snapshot avoids hundreds of reads.
     const collection = this.db.collection<{ _id: string; catalog: Catalog; hash: string; createdAt: Date }>('wiki_catalog');
     const existing = await collection.findOne({ _id: 'current' });
-    if (existing) return existing.catalog;
+    if (existing) {
+      // Only a newer bundled snapshot can advance shared reference data. Old clients cannot downgrade it.
+      if (Date.parse(catalog.downloaded) > Date.parse(existing.catalog.downloaded)) {
+        await collection.updateOne({ _id: 'current', hash: existing.hash }, { $set: {
+          catalog, hash: createHash('sha256').update(JSON.stringify(catalog)).digest('hex')
+        } });
+        return (await collection.findOne({ _id: 'current' }))!.catalog;
+      }
+      return existing.catalog;
+    }
     await collection.updateOne({ _id: 'current' }, { $setOnInsert: { catalog, hash: createHash('sha256').update(JSON.stringify(catalog)).digest('hex'), createdAt: new Date() } }, { upsert: true });
     return (await collection.findOne({ _id: 'current' }))!.catalog;
   }

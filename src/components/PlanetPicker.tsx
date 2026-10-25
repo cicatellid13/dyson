@@ -1,3 +1,4 @@
+import { ThemedSelect } from './ThemedSelect';
 import { useState } from 'react';
 import type { DesignSection } from '../lib/design';
 
@@ -14,15 +15,15 @@ export function PlanetPicker({ sections, planetId, legacyName, label, direction,
   const choices = planets.filter(planet => planet.id !== excludedPlanetId && (planet.parentId ?? STANDALONE) === selectedGroup).sort((a,b) => a.name.localeCompare(b.name));
   return <fieldset className="planet-picker">
     <legend>{direction}</legend>
-    <label>System<select aria-label={`${label} ${direction.toLowerCase()} system`} value={selectedGroup} disabled={lockedSystemId !== undefined} onChange={event => { setGroup(event.target.value); onChange(null); }}>
+    <label>System<ThemedSelect aria-label={`${label} ${direction.toLowerCase()} system`} value={selectedGroup} disabled={lockedSystemId !== undefined} onChange={event => { setGroup(event.target.value); onChange(null); }}>
       <option value="">Select a system</option>
       {systems.map(system => <option key={system.id} value={system.id}>{system.name || 'Unnamed system'}</option>)}
       {planets.some(planet => planet.parentId === null) && <option value={STANDALONE}>Standalone planets</option>}
-    </select></label>
-    <label>Planet<select aria-label={`${label} ${direction.toLowerCase()} planet`} value={choices.some(planet => planet.id === selected?.id) ? selected!.id : ''} disabled={!selectedGroup || !choices.length} onChange={event => { const id = event.target.value; if (!id || choices.some(planet => planet.id === id)) onChange(id || null); }}>
+    </ThemedSelect></label>
+    <label>Planet<ThemedSelect aria-label={`${label} ${direction.toLowerCase()} planet`} value={choices.some(planet => planet.id === selected?.id) ? selected!.id : ''} disabled={!selectedGroup || !choices.length} onChange={event => { const id = event.target.value; if (!id || choices.some(planet => planet.id === id)) onChange(id || null); }}>
       <option value="">{selectedGroup && !choices.length ? 'No planets in this system' : 'Select a planet'}</option>
       {choices.map(planet => <option key={planet.id} value={planet.id}>{planet.name || 'Unnamed planet'}</option>)}
-    </select></label>
+    </ThemedSelect></label>
     {!planets.length && <p className="design-empty-small">Create a planet in Logistics Network to connect this route.</p>}
     {selected && selected.id === excludedPlanetId && <p className="design-warning">Choose another planet as the {direction === 'From' ? 'import source' : 'export destination'}.</p>}
     {lockedSystemId && selected && selected.parentId !== lockedSystemId && <p className="design-warning">This saved destination is outside the current system. Choose a planet in this system to update it.</p>}

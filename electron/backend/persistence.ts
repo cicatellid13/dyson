@@ -47,6 +47,12 @@ export class Persistence {
       this.cache = { base: remote.data, data: remote.data, catalog };
       await this.persist();
     }
+    if (Date.parse(bundled.downloaded) > Date.parse(this.cache.catalog.downloaded)) {
+      this.cache.catalog = bundled;
+      // A bundled update works offline; share it when the database is reachable.
+      try { this.cache.catalog = await this.db.seedCatalog(bundled); } catch { /* Retain local snapshot. */ }
+      await this.persist();
+    }
     if (recovery) await this.recover(recovery);
     await this.sync();
     return { view: this.view(), catalog: this.cache.catalog };

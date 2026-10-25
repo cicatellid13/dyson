@@ -37,3 +37,12 @@ test('Dark Fog off removes combat content and all recipe/facility references wit
  assert.equal(JSON.stringify(c),before);
  assert.equal(catalogForDarkFog(c,true),c);
 });
+test('cached Overviews preserve paragraphs and resolve aliases to valid local items',()=>{
+ const graphene=c.items.find(i=>i.name==='Graphene');
+ assert.equal(graphene.overview.length,3);
+ assert.ok(graphene.overview.flat().some(s=>s.text==='ILS'&&s.itemId===2104));
+ assert.ok(graphene.overview[2].map(s=>s.text).join('').includes('fuel'));
+ for(const item of c.items)for(const paragraph of item.overview??[])for(const segment of paragraph){
+  assert.equal(typeof segment.text,'string');if(segment.itemId)assert.ok(ids.has(segment.itemId));
+ }
+});

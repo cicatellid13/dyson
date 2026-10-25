@@ -170,3 +170,13 @@ Import/export item pickers use custom dark menus with item names on the left and
 - Export destination choices also exclude the current planet; neither import nor export routes can select their own planet in the picker.
 
 - Logistics item dropdowns show item names and icons without direct-navigation arrows, including the selected item field. Dragging items to Favorites remains available; existing cargo rows retain their navigation arrows.
+
+## Consistent dropdown theme
+- All fixed-choice dropdowns use the app’s dark background, green borders/highlights, and muted text on both Mac and Windows, including recipes, route systems/planets, units, assignment, and note folders. Searchable item menus retain their existing dark styling.
+- Menus support keyboard arrows, Home/End, type-to-match, Enter/Space selection, Escape/Tab dismissal, outside clicks, selected checkmarks, and disabled controls. Popup menus stay within the viewport and render above scrolling panels.
+
+## Item Overview and quantities
+- Cache wiki Overview paragraphs as structured text and resolved item IDs; never render remote HTML or fetch on item selection. Preserve paragraph spacing and bold text. Item references show the canonical item name and bundled icon, navigate internally, and can be dragged to Favorites. Non-item references remain readable text.
+- Overview starts at three lines with Read more / Show less; absent sections show a brief unavailable message. The original game description is accessible through a small info button immediately right of the favorite star.
+- Newer bundled catalog snapshots update the shared catalog without modifying workspace data; older installations cannot downgrade it.
+- Recipe quantities appear in small cyan numbers at the bottom-right of icons for inputs, nested outputs, main outputs and production-chain nodes, retaining exact values and accessible quantity labels.

@@ -1,4 +1,4 @@
-export type Item = { id:number; name:string; type:string; description:string; icon:string|null; stack_size:number; can_build?:boolean; mining_from?:string; explicit_produce_from?:string; energy?:number };
+export type Item = { id:number; name:string; type:string; description:string; overview?: {text:string; itemId?:number; bold?:boolean}[][]; overviewSource?:string; icon:string|null; stack_size:number; can_build?:boolean; mining_from?:string; explicit_produce_from?:string; energy?:number };
 export type Recipe = {id:number; name:string; type:string; inputs:number[]; outputs:number[]; seconds:number; handcraft?:boolean; explicit?:boolean; description?:string};
 export type Catalog = {items:Item[]; recipes:Recipe[]; facilities:Record<string,{name:string; buildings:number[]}>; techs:{id:number;name:string;recipes?:number[]}[]; categories:Record<string,string>; downloaded:string; sourceUpdated:string; source:string; revision:number};
 export const pairs = (values:number[]) => Array.from({length:values.length/2},(_,i)=>({id:values[i*2],count:values[i*2+1]}));
