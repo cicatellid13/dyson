@@ -136,3 +136,10 @@ test('favorite order survives sync while independent additions are retained', ()
  const conflict=copy(base);conflict.favorites=[2,1,3];
  assert.throws(()=>mergeWorkspace(base,local,conflict),/conflict/);
 });
+test('catalog default view merges with unrelated workspace changes and persists as a small patch',()=>{
+ const base=fixture(), local=copy(base), remote=copy(base);
+ local.defaultCatalogView='grid'; remote.favorites=[1303];
+ const merged=mergeWorkspace(base,local,remote);
+ assert.equal(merged.defaultCatalogView,'grid');assert.deepEqual(merged.favorites,[1303]);
+ assert.deepEqual(workspacePatch(encode(base),encode(local)).set,{'data.defaultCatalogView':'grid'});
+});

@@ -1,9 +1,9 @@
 import { isDeepStrictEqual } from 'node:util';
 import type { PlanningFolder, PlanningNote } from '../../src/lib/planning';
 import { validateWorkspace, type Workspace } from '../../src/lib/workspace';
-export type StoredData = { sections: Record<string, Workspace['design']['sections'][number]>; favorites: number[]; darkFog: boolean; folders?: Record<string, PlanningFolder>; notes?: Record<string, PlanningNote> };
-export function encode(data: Workspace): StoredData { return { folders: Object.fromEntries((data.planning?.folders ?? []).map(f => [f.id, f])), notes: Object.fromEntries((data.planning?.notes ?? []).map(n => [n.id, n])), sections: Object.fromEntries(data.design.sections.map(s => [s.id, s])), favorites: data.favorites, darkFog: data.darkFog }; }
-export function decode(data: StoredData): Workspace { return validateWorkspace({ planning: { folders: Object.values(data.folders ?? {}), notes: Object.values(data.notes ?? {}) }, design: { version: 1, sections: Object.values(data.sections) }, favorites: data.favorites, darkFog: data.darkFog }); }
+export type StoredData = { defaultCatalogView?: 'list' | 'grid'; sections: Record<string, Workspace['design']['sections'][number]>; favorites: number[]; darkFog: boolean; folders?: Record<string, PlanningFolder>; notes?: Record<string, PlanningNote> };
+export function encode(data: Workspace): StoredData { return { ...(data.defaultCatalogView ? {defaultCatalogView:data.defaultCatalogView} : {}), folders: Object.fromEntries((data.planning?.folders ?? []).map(f => [f.id, f])), notes: Object.fromEntries((data.planning?.notes ?? []).map(n => [n.id, n])), sections: Object.fromEntries(data.design.sections.map(s => [s.id, s])), favorites: data.favorites, darkFog: data.darkFog }; }
+export function decode(data: StoredData): Workspace { return validateWorkspace({ defaultCatalogView:data.defaultCatalogView, planning: { folders: Object.values(data.folders ?? {}), notes: Object.values(data.notes ?? {}) }, design: { version: 1, sections: Object.values(data.sections) }, favorites: data.favorites, darkFog: data.darkFog }); }
 const same = isDeepStrictEqual;
 const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
 export function mergeValue(base: unknown, local: unknown, remote: unknown): unknown {
@@ -49,6 +49,7 @@ export function workspacePatch(previous: StoredData, next: StoredData) {
     }
   }
   if (!same(previous.favorites, next.favorites)) set['data.favorites'] = next.favorites;
+  if (previous.defaultCatalogView !== next.defaultCatalogView) { if(next.defaultCatalogView) set['data.defaultCatalogView']=next.defaultCatalogView; else unset['data.defaultCatalogView']=''; }
   if (previous.darkFog !== next.darkFog) set['data.darkFog'] = next.darkFog;
   return { set, unset };
 }

@@ -180,3 +180,9 @@ Import/export item pickers use custom dark menus with item names on the left and
 - Overview starts at three lines with Read more / Show less; absent sections show a brief unavailable message. The original game description is accessible through a small info button immediately right of the favorite star.
 - Newer bundled catalog snapshots update the shared catalog without modifying workspace data; older installations cannot downgrade it.
 - Recipe quantities appear in small cyan numbers at the bottom-right of icons for inputs, nested outputs, main outputs and production-chain nodes, retaining exact values and accessible quantity labels.
+
+## All items grid
+- All items supports List and Grid views. Grid uses the wiki's cached grid positions with Components and Buildings tabs, fourteen columns and eight Roman-numeral rows. Row numerals share the shiny cyan quantity style.
+- Each icon navigates to its item detail below the grid, displays its name on hover, and supports dragging to Favorites. Search and Dark Fog filtering apply without shifting grid positions; hidden items leave empty cells.
+- A Default to grid toggle persists in the shared workspace using a small database update. Returning to All items or restarting uses the saved default; temporary view switching does not change it. Existing workspaces default to List.
+- Grid width is capped at 920px with icons up to 52px to keep it compact on wide windows; narrow windows retain horizontal scrolling.
