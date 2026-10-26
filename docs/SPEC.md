@@ -203,3 +203,15 @@ Import/export item pickers use custom dark menus with item names on the left and
 - Packaged Windows checks for an update before opening the editable workspace. If downloaded within 30 seconds, install silently and relaunch automatically; failures/timeouts open the app and leave later installation for normal exit so active editing is not interrupted.
 - When a startup download is identified, show Updating to version [version] in a dark notice with only OK. The notice closes automatically after five seconds; dismissing it does not cancel the update. Closing the notice must not quit startup.
 - Use a bundled cyan/purple triangular cursor with a subtle luminous rim; text fields retain the text caret and disabled buttons retain their unavailable cursor.
+- To-do creation is Add task → choose Import, Export, Production, Power or Issue → immediately create/focus an editable task. Legacy tasks retain their text and display a generic Task label.
+- Planning note bodies start at one line, grow with content up to 320px, then scroll internally.
+- Sidebar omits the cache and contributor sentences while retaining the licensing link. Text pointers and insertion carets use cyan/purple styling; native drags use the bundled triangular cursor as their drag image (OS operation badges remain system-controlled).
+- To-do filters use colored icon chips with counts: All, Import, Export, Production, Power, Issue, and Other for legacy untyped tasks. All is the default; selecting a chip filters only the current note and selecting it again resets to All. Adding a task switches to its type so it remains visible. Counts/progress and Clear completed apply to the entire note, including hidden tasks.
+- Task type badges sit to the right of task text, use a centered icon in a uniform 42×22px bubble, and expose the type name as a tooltip and accessible label.
+- Task icon bubbles appear before the task text and are buttons: clicking selects that type filter, or resets to All when already selected, matching the top filter chips.
+- To-do creation uses a compact + button and icon-only type choices with name tooltips. Task badges remain on the left and act as type filters.
+- Expanded recipe inputs omit the redundant Produces row. Main recipe outputs remain available.
+- Grid item selection replaces the grid with the item detail view and offers All items grid navigation, rather than scrolling within the grid page.
+- Logistics cargo names/icons navigate directly; separate disclosure controls edit route options. Navigation arrows are removed from cargo links, while colored direction arrows remain. Draggable surfaces retain the normal custom pointer until pressed.
+
+- Logistics item links open a standalone item detail page regardless of the default catalog layout. Standalone detail has one “← Grid” return button and no history button. The sidebar wiki link below cloud status follows the last viewed item, including while in Planning or Logistics Network.

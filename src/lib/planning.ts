@@ -1,5 +1,7 @@
 export type PlanningFolder = { id: string; name: string; order?: number };
-export type ChecklistItem = { id:string; text:string; done:boolean };
+export const todoTypes = ['import','export','production','power','issue'] as const;
+export type TodoType = typeof todoTypes[number];
+export type ChecklistItem = { type?:TodoType; id:string; text:string; done:boolean };
 export type PlanningNote = { checklist?: ChecklistItem[]; id: string; folderId: string | null; title: string; body: string; order?: number };
 export type PlanningData = { folders: PlanningFolder[]; notes: PlanningNote[] };
 export const emptyPlanning = (): PlanningData => ({ folders: [], notes: [] });
@@ -20,7 +22,7 @@ export function validatePlanning(input: unknown): PlanningData {
   for (const note of value.notes) {
     if (!note || !validRecordId(note.id) || noteIds.has(note.id) || typeof note.title !== 'string' || note.title.length > 120 || typeof note.body !== 'string' || (note.folderId !== null && !folderIds.has(note.folderId))) throw Error('Invalid planning note.');
     if (note.order !== undefined && !Number.isFinite(note.order)) throw Error('Invalid note order.');
-    if(note.checklist !== undefined && (!Array.isArray(note.checklist)||note.checklist.length>1000||new Set(note.checklist.map(t=>t.id)).size!==note.checklist.length||note.checklist.some(t=>!t||!validRecordId(t.id)||typeof t.text!=='string'||t.text.length>1000||typeof t.done!=='boolean'))) throw Error('Invalid checklist.');
+    if(note.checklist !== undefined && (!Array.isArray(note.checklist)||note.checklist.length>1000||new Set(note.checklist.map(t=>t.id)).size!==note.checklist.length||note.checklist.some(t=>!t||!validRecordId(t.id)||typeof t.text!=='string'||t.text.length>1000||typeof t.done!=='boolean'||(t.type!==undefined&&!todoTypes.includes(t.type))))) throw Error('Invalid checklist.');
     noteIds.add(note.id);
   }
   return { folders: value.folders.map(f => ({ id: f.id, name: f.name, ...(f.order === undefined ? {} : { order: f.order }) })), notes: value.notes.map(n => ({ id: n.id, folderId: n.folderId, title: n.title, body: n.body, ...(n.checklist===undefined?{}:{checklist:n.checklist.map(t=>({...t}))}), ...(n.order === undefined ? {} : { order: n.order }) })) };

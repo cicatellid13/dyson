@@ -1,8 +1,9 @@
+import { themeDrag } from '../lib/dragAppearance';
 import { linkExport, updateTrades } from '../lib/design';
 import { PlanetTags, Specializations } from './Specializations';
 import { useSessionExpansion, useSessionSelection } from '../lib/sessionExpansion';
 import { ThemedSelect } from './ThemedSelect';
-import { ItemAccess, ItemJump, useItemAccess } from './ItemAccess';
+import { ItemLink, useItemAccess } from './ItemAccess';
 import { SystemGraph, VisualizeIcon } from './SystemGraph';
 import { AutoTextarea } from './AutoTextarea';
 import { LogisticsArrow } from './LogisticsArrow';
@@ -46,11 +47,8 @@ function TradeList({ direction, entries, items, sections, onChange, collapsible 
       const item = lookup.get(entry.itemId);
       return <div className="trade-entry" key={entry.id}>
         <div className="input-access-row" {...itemActions.dragProps(entry.itemId)}>
-        <button type="button" className={`trade-item-heading trade-entry-toggle ${isDefenseItem(item) ? 'defense-item' : ''}`} aria-expanded={!collapsible || expandedEntries.has(entry.id)} disabled={!collapsible} onClick={() => setExpandedEntries(current => { const next = new Set(current); if(next.has(entry.id))next.delete(entry.id);else next.add(entry.id);return next; })}>
-          {item?.icon && <img className="item-icon" src={`${import.meta.env.BASE_URL}${item.icon}`} alt=""/>}
-          <strong>{item?.name ?? `Item ${entry.itemId}`}</strong>
-          {collapsible && <span className="trade-entry-chevron" aria-hidden="true">{expandedEntries.has(entry.id) ? '▾' : '▸'}</span>}
-        </button><ItemJump id={entry.itemId} name={item?.name}/></div>
+        <ItemLink id={entry.itemId} name={item?.name}>{item?.icon&&<img className="item-icon" src={`${import.meta.env.BASE_URL}${item.icon}`} alt=""/>}<strong>{item?.name??`Item ${entry.itemId}`}</strong></ItemLink>
+        {collapsible&&<button type="button" className="trade-options-toggle" aria-label={`Edit ${item?.name} ${direction} options`} aria-expanded={expandedEntries.has(entry.id)} onClick={()=>setExpandedEntries(current=>{const next=new Set(current);if(next.has(entry.id))next.delete(entry.id);else next.add(entry.id);return next;})}>{expandedEntries.has(entry.id)?'▾':'▸'}</button>}</div>
         {(!collapsible || expandedEntries.has(entry.id)) && <div className="trade-entry-options"><div className="trade-quantity">
           <label>Amount<input aria-label={`${item?.name} ${direction} amount`} type="number" min="0" step="any" placeholder="Optional" value={entry.amount} onChange={e => { if (e.target.value === '' || Number(e.target.value) >= 0) patch(entry.id, { amount: e.target.value }); }}/></label>
           <label>Unit<ThemedSelect aria-label={`${item?.name} ${direction} unit`} value={entry.unit} onChange={e => patch(entry.id, { unit: e.target.value as TradeEntry['unit'] })}><option>items/min</option><option>items/s</option><option>items</option></ThemedSelect></label>
@@ -74,8 +72,7 @@ function PlanetTradeSummary({ entries, direction, items }: {
     {ordered.length ? ordered.map(entry => {
       const item = items.get(entry.itemId);
       return <span key={entry.id} className={`planet-trade-row ${isDefenseItem(item) ? 'defense-item' : ''}`}>
-        {item?.icon && <img className="item-icon" src={`${import.meta.env.BASE_URL}${item.icon}`} alt=""/>}
-        <ItemAccess id={entry.itemId} name={item?.name}><span className="planet-trade-name">{item?.name ?? `Item ${entry.itemId}`}</span></ItemAccess>
+        <ItemLink id={entry.itemId} name={item?.name}>{item?.icon && <img className="item-icon" src={`${import.meta.env.BASE_URL}${item.icon}`} alt=""/>}<span className="planet-trade-name">{item?.name ?? `Item ${entry.itemId}`}</span></ItemLink>
         <span className="planet-trade-arrow" aria-hidden="true">
           <LogisticsArrow direction={direction}/>
         </span>
@@ -173,7 +170,7 @@ export function Design({ catalog }: { catalog: Catalog }) {
   function sectionButton(section: DesignSection, nested = false) {
     return <button key={section.id} className={`design-location ${nested ? 'nested' : ''} ${activeId === section.id ? 'active' : ''} ${dropTarget === section.id ? 'drop-target' : ''}`} draggable
       aria-expanded={section.kind === 'system' ? expandedSystems.has(section.id) : undefined}
-      onDragStart={event => { event.stopPropagation(); setDraggingId(section.id); event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain',section.id); }}
+      onDragStart={event => { event.stopPropagation(); themeDrag(event); setDraggingId(section.id); event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain',section.id); }}
       onDragOver={event => { const from = data.sections.find(s => s.id === draggingId); if (!from || from.id === section.id || from.kind !== section.kind || from.parentId !== section.parentId) return; event.preventDefault(); event.dataTransfer.dropEffect = 'move'; setDropTarget(section.id); }}
       onDrop={event => { event.preventDefault(); if (draggingId) commit(reorderSections(data,draggingId,section.id)); setDraggingId(null); setDropTarget(null); }}
       onDragEnd={() => { setDraggingId(null); setDropTarget(null); }}

@@ -1,3 +1,4 @@
+import { themeDrag } from '../lib/dragAppearance';
 import { NoteChecklist } from './NoteChecklist';
 import { useSessionExpansion, useSessionSelection } from '../lib/sessionExpansion';
 import { ThemedSelect } from './ThemedSelect';
@@ -27,7 +28,7 @@ export function Planning() {
   function dragProps(kind: 'folder' | 'note', id: string) {
     return {
       draggable: true,
-      onDragStart: (event: React.DragEvent) => { event.stopPropagation(); setDragging({kind,id}); event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', id); },
+      onDragStart: (event: React.DragEvent) => { event.stopPropagation(); themeDrag(event); setDragging({kind,id}); event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', id); },
       onDragOver: (event: React.DragEvent) => {
         if (!dragging || dragging.kind !== kind || dragging.id === id) return;
         if (kind === 'note' && data.notes.find(n => n.id === dragging.id)?.folderId !== data.notes.find(n => n.id === id)?.folderId) return;
@@ -105,7 +106,7 @@ export function Planning() {
       {active ? <div key={active.id} className="planning-page">
         <div className="planning-toolbar"><label>Folder<ThemedSelect aria-label="Note folder" value={active.folderId ?? ''} onChange={event => { const id = event.target.value || null; patch({ folderId: id, order: nextOrder(data.notes.filter(n => n.folderId === id)) }); setFolderId(id); expand(id ?? 'scratch-pad'); }}><option value="">Scratch pad</option>{ordered(data.folders).map(f => <option key={f.id} value={f.id}>{f.name || 'Untitled folder'}</option>)}</ThemedSelect></label><button className="design-remove" onClick={() => setDeleting({kind:'note',id:active.id})}>Delete note</button></div>
         <input className="planning-title" aria-label="Note title" placeholder="Untitled note" value={active.title} maxLength={120} onChange={event => patch({title:event.target.value})}/>
-        <AutoTextarea className="planning-body" aria-label="Note text" placeholder="Start writing…" value={active.body} onChange={event => patch({body:event.target.value})} spellCheck/>
+        <AutoTextarea rows={1} className="planning-body" aria-label="Note text" placeholder="Start writing…" value={active.body} onChange={event => patch({body:event.target.value})} spellCheck/>
         <NoteChecklist entries={active.checklist??[]} onChange={checklist=>patch({checklist})}/>
       </div> : <div className="planning-folder-editor">
         {folder ? <><div className="eyebrow">FOLDER</div><label className="design-name">Folder name<input aria-label="Folder name" maxLength={120} value={folder.name} onChange={event => commit(value => ({ ...value, folders:value.folders.map(f => f.id === folder.id ? {...f,name:event.target.value} : f) }))}/></label><button className="design-remove" onClick={() => setDeleting({kind:'folder',id:folder.id})}>Delete folder</button></> : <h2>Scratch pad</h2>}

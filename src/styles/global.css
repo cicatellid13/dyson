@@ -74,3 +74,9 @@
 /* Local, lightweight cursor; text fields retain their precise text caret. */
 html,body,button,a,[role=button],[role=option],[role=tab],label,input[type=checkbox],input[type=radio]{cursor:url('../assets/nebula.svg') 3 3, auto}
 button:hover,a:hover,[draggable=true]{cursor:url('../assets/nebula.svg') 3 3, pointer}input:not([type=checkbox]):not([type=radio]),textarea,[contenteditable=true]{cursor:text}button:disabled{cursor:not-allowed}
+input:not([type=checkbox]):not([type=radio]),textarea,[contenteditable=true]{cursor:url('../assets/nebula-text.svg') 9 13,text;caret-color:#84edfa}
+[draggable=true],.ingredient[draggable=true],.favorite-item-row[draggable],.item-access,.planning-folder-link[draggable],.planning-note-link[draggable],.design-location[draggable]{cursor:url('../assets/nebula.svg') 3 3,auto}
+[draggable=true]:active,.ingredient[draggable=true]:active,.planning-folder-link[draggable]:active,.planning-note-link[draggable]:active,.design-location[draggable]:active{cursor:grabbing}
+.logistics-item-link{display:inline-flex;align-items:center;gap:8px;min-width:0;text-align:left;padding:3px 0;color:inherit}.logistics-item-link:hover{color:#bce9c8}.logistics-item-link img{width:28px;height:28px;object-fit:contain}.input-access-row>.logistics-item-link,.planet-trade-row>.logistics-item-link,.graph-resource>.logistics-item-link{flex:1}.trade-options-toggle{padding:8px;color:#91b5a2}.logistics-item-link strong{font-size:12px}
+
+.sidebar footer .sidebar-wiki{display:block;font-size:inherit;margin-bottom:8px;color:#b9d9c5}
