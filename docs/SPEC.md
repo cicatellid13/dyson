@@ -215,3 +215,5 @@ Import/export item pickers use custom dark menus with item names on the left and
 - Logistics cargo names/icons navigate directly; separate disclosure controls edit route options. Navigation arrows are removed from cargo links, while colored direction arrows remain. Draggable surfaces retain the normal custom pointer until pressed.
 
 - Logistics item links open a standalone item detail page regardless of the default catalog layout. Standalone detail has one “← Grid” return button and no history button. The sidebar wiki link below cloud status follows the last viewed item, including while in Planning or Logistics Network.
+
+- To-do creation uses a centered vector plus and an icon-only close button aligned with the task-type choices; both retain accessible labels and tooltips.

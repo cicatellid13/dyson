@@ -24,3 +24,5 @@
 .checklist-row .todo-type-icon{display:inline-flex;align-items:center;justify-content:center;flex:0 0 42px;width:42px;height:22px;padding:0;border-radius:11px;font-size:15px;line-height:1}.todo-type-icon>span{display:flex;align-items:center;justify-content:center;width:16px;height:16px}.todo-type-icon .logistics-arrow{width:16px;height:16px}.todo-type-icon.production{color:#bba3ee}.todo-type-icon:focus-visible{outline:2px solid #9bd5ae;outline-offset:2px}
 .checklist-row button.todo-type-icon:hover,.checklist-row button.todo-type-icon[aria-pressed=true]{background:#294238;border-color:currentColor}
 .todo-add .todo-add-button{width:62px;height:28px;padding:0;font-size:25px;line-height:1;display:grid;place-items:center}.todo-type-menu .todo-type-icon{width:42px;height:26px;padding:0;display:flex;align-items:center;justify-content:center;font-size:17px}.todo-type-menu .logistics-arrow{width:16px;height:16px}
+
+.todo-type-menu{align-items:center}.todo-type-menu .todo-type-cancel{display:flex;align-items:center;justify-content:center;width:42px;height:26px;padding:0}.todo-add-button svg,.todo-type-cancel svg{display:block;flex-shrink:0}
