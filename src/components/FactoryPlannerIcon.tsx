@@ -1,0 +1,4 @@
+/** Gear and three cubes, matching the Factory Planner reference. */
+export function FactoryPlannerIcon({className=''}:{className?:string}) {
+  return <svg className={className} width="22" height="22" viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinejoin="round" strokeLinecap="round" aria-hidden="true"><path d="M13 2h6l.6 3.5 2.6 1.1 2.9-2 4.2 4.2-2 2.9 1.1 2.6L32 15v5l-3.6.6-1.1 2.6 2 2.9-4.2 4.2-2.9-2-2.6 1.1L19 33h-6l-.6-3.6-2.6-1.1-2.9 2-4.2-4.2 2-2.9-1.1-2.6L0 20v-5l3.6-.7 1.1-2.6-2-2.9 4.2-4.2 2.9 2 2.6-1.1L13 2Z" transform="translate(2 0) scale(.875)"/><g strokeWidth="1.8" transform="translate(3.52 2.68) scale(.78)"><path d="m16 8 4 2.3v4.6l-4 2.3-4-2.3v-4.6L16 8Zm-4 2.3 4 2.4 4-2.4M16 12.7v4.5M11.8 15.2l4 2.3v4.6l-4 2.3-4-2.3v-4.6l4-2.3Zm-4 2.3 4 2.4 4-2.4m-4 2.4v4.5M20.2 15.2l4 2.3v4.6l-4 2.3-4-2.3v-4.6l4-2.3Zm-4 2.3 4 2.4 4-2.4m-4 2.4v4.5"/></g></svg>;
+}

@@ -1,6 +1,8 @@
 # Factory Planner
 
-Client-only, single-stage planning. Both the standalone page and item accordion instantiate `Calculator`; both call the same pure `calculateFactory`. No database, storage, network, or Logistics Network mutations. The standalone page stays mounted while other sections are shown, retaining its selection and settings for this app session only. Closing the app resets it. Embedded state resets on unmount. The default mode sizes one selected-product belt; the other sizes a requested rate.
+Client-side, single-stage planning. Both the standalone page and item accordion use one calculator with an editable target that defaults to the selected belt's capacity. There are no named modes in the interface. Changing belts follows the default until a target is manually entered; “Fill one belt” restores automatic sizing.
+
+The standalone selection/target survives navigation for the current session. Last-used facility (one ID, not per recipe), belt, sorter and reach are validated and stored on this device in localStorage. Incompatible facility families fall back to a valid option without overwriting the saved choice. Equipment preferences are shared between inline and standalone calculators. No database or Logistics Network changes; production plans and targets are never persisted.
 
 ## Rates and provenance
 
@@ -26,8 +28,8 @@ Unsupported: proliferation, cargo stacking, pile sorters, fractionation/probabil
 ## Acceptance checks
 
 - Sidebar immediately below Logistics Network; searchable icon item picker.
-- Production Capacity default, no machine-count input; Infrastructure target in seconds/minutes, converting units preserves rate.
-- Shared dark controls and results; embedded accordion initially collapsed and uses current item, icon-only modes with tooltips.
+- One editable target, defaulting to one belt; changing units preserves rate.
+- Shared dark controls and results; embedded accordion initially collapsed and uses current item and the same controls.
 - Tests cover rates, all facility families, rounding, fractions, multi-output, input belts, multiple output belts, sorter/reach limits, alternates, invalid/unsupported and impossible configurations, determinism.
 
 Item pickers reopen with their full allowed item list while retaining the selected value. Typing starts a fresh filter; closing the menu does not clear the selection.

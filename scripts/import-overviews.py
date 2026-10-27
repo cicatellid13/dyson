@@ -1,5 +1,5 @@
 """Cache wiki Overview paragraphs as safe structured text, resolving item aliases."""
-import json, re, pathlib, concurrent.futures, datetime, urllib.parse
+import json, re, pathlib, concurrent.futures, datetime, urllib.parse, sys
 from html.parser import HTMLParser
 from importlib.machinery import SourceFileLoader
 wiki = SourceFileLoader('wiki_import', str(pathlib.Path(__file__).with_name('import-wiki.py'))).load_module()
@@ -29,22 +29,43 @@ class OverviewParser(HTMLParser):
         if self.link: segment['wikiTitle']=self.link
         if self.bold: segment['bold']=True
         self.current.append(segment)
+def parse_paragraphs(html):
+    parser=OverviewParser(); parser.feed(html)
+    return parser.paragraphs
+
 def extract(html):
     match=re.search(r'<h([1-6])\b[^>]*>.*?id="Overview".*?</h\1>',html,re.S)
-    if not match: return []
-    body=re.split(r'<h[12]\b',html[match.end():],maxsplit=1)[0]
-    parser=OverviewParser(); parser.feed(body)
-    return parser.paragraphs
+    if match:
+        body=re.split(r'<h[12]\b',html[match.end():],maxsplit=1)[0]
+        paragraphs=parse_paragraphs(body)
+        if paragraphs: return paragraphs
+    # Some pages have a lead rather than an Overview heading. Exclude quotes,
+    # infoboxes and tables so the in-game description stays in the info popup.
+    lead=re.sub(r'<(aside|blockquote|table)\b[^>]*>.*?</\1>', '', html, flags=re.S)
+    lead=re.split(r'<h[1-6]\b',lead,maxsplit=1)[0]
+    paragraphs=parse_paragraphs(lead)
+    if paragraphs: return paragraphs
+    # Stub articles can still have useful infobox facts. Preserve linked names.
+    info=re.search(r'<aside\b[^>]*>.*?</aside>',html,re.S)
+    if not info: return []
+    fields=re.findall(r'<h3[^>]*>(.*?)</h3>\s*<div class="pi-data-value[^"]*">(.*?)</div>',info[0],re.S)
+    allowed={'Category','Made In','Unlocked Under','Version Added','Energy','Fuel Chamber Generation','Work Consumption','Idle Consumption','Production Speed','Research Speed'}
+    return [paragraph for label,value in fields if re.sub('<[^>]+>','',label).strip() in allowed
+            for paragraph in parse_paragraphs('<p><strong>'+label+': </strong>'+value+'</p>')]
 
 def main():
     path=ROOT/'public/data/catalog.json'; catalog=json.loads(path.read_text())
     cache=ROOT/'.cache/wiki-overviews'; cache.mkdir(parents=True,exist_ok=True)
     def fetch(item):
         file=cache/f"{item['id']}.json"
-        if file.exists(): result=json.loads(file.read_text())
+        if file.exists() and not ('--refresh-missing' in sys.argv and not item.get('overview')): result=json.loads(file.read_text())
         else:
             result=wiki.api(action='parse',page=item['name'],prop='text',redirects='1')
-            if 'error' in result: return item['id'],[]
+            if 'error' in result:
+                if result['error'].get('code')=='missingtitle':
+                    print('Missing wiki page:',item['name'])
+                    return item['id'],item.get('overview',[])
+                raise ValueError('Wiki page fetch failed: '+item['name'])
             file.write_text(json.dumps(result))
         return item['id'],extract(result['parse']['text']['*'])
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool: overviews=dict(pool.map(fetch,catalog['items']))

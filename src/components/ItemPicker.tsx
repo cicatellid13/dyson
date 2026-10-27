@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useId, useRef, useState, type CSSProperties
 import { isDefenseItem, type Item } from '../lib/catalog';
 
 /** Searchable local item menu with the same palette as the app. */
-export function ItemPicker({ items, value, onChange, label, placeholder = 'Search an item…' }: {
+export function ItemPicker({ items, value, onChange, label, placeholder = 'Search an item...' }: {
   items: Item[]; value: string; onChange: (value: string) => void; label: string; placeholder?: string;
 }) {
   const itemActions = useItemAccess();
@@ -15,7 +15,7 @@ export function ItemPicker({ items, value, onChange, label, placeholder = 'Searc
   const [menuStyle, setMenuStyle] = useState<CSSProperties>({ visibility: 'hidden' });
   const list = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
-  const matches = items.filter(item => item.name.toLowerCase().includes(query.trim().toLowerCase()));
+  const matches = items.filter(item => item.name.toLowerCase().includes(query.trim().toLowerCase())).sort((a, b) => a.name.localeCompare(b.name));
   const selected = items.find(item => item.name.toLowerCase() === value.trim().toLowerCase());
   useEffect(() => {
     if (open && active >= 0) list.current?.children[active]?.scrollIntoView({ block: 'nearest' });
@@ -50,7 +50,7 @@ export function ItemPicker({ items, value, onChange, label, placeholder = 'Searc
     <div className={`item-picker-field ${isDefenseItem(selected) ? 'defense-item' : ''}`} {...(selected?itemActions.dragProps(selected.id):{})}>
       <input ref={input} role="combobox" aria-label={label} aria-autocomplete="list" aria-expanded={open}
         aria-controls={listId} aria-activedescendant={open && active >= 0 && matches[active] ? `${listId}-${matches[active].id}` : undefined}
-        autoComplete="off" data-tooltip={value || placeholder} value={value} placeholder={placeholder}
+        autoComplete="off" value={value} placeholder={placeholder}
         onFocus={openChoices} onClick={() => { if (!open) openChoices(); }}
         onChange={event => { setQuery(event.target.value); onChange(event.target.value); setActive(-1); setOpen(true); }}
         onKeyDown={event => {

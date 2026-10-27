@@ -1,3 +1,4 @@
+import { EditablePlanetName } from './EditablePlanetName';
 import { RemoveRouteIcon } from './RemoveRouteIcon';
 import { AdvancedIcon, RouteStatus } from './RouteStatus';
 import { themeDrag } from '../lib/dragAppearance';
@@ -117,7 +118,7 @@ function PlanetCard({ planet, items, onOpen }: { planet: DesignSection; items: M
           <span className="logistics-tooltip" role="tooltip">{value === 'imports' ? 'Imports' : 'Exports'}</span>
         </button>)}
       </div></div>
-      <div className="planet-item-filter"><span className="logistics-filter-label">Item</span><ItemPicker key={direction} label={`${planet.name} item filter`} items={choiceItems} value={itemSearch} onChange={setItemSearch} placeholder="All items"/>{itemSearch && <button className="planet-filter-reset" aria-label={`Clear ${planet.name} item filter`} onClick={() => setItemSearch('')}>All items</button>}</div>
+      <div className="planet-item-filter"><span className="logistics-filter-label">Item</span><ItemPicker key={direction} label={`${planet.name} item filter`} items={choiceItems} value={itemSearch} onChange={setItemSearch}/>{itemSearch && <button className="planet-filter-reset" aria-label={`Clear ${planet.name} item filter`} onClick={() => setItemSearch('')}>All items</button>}</div>
     </div>
     {(direction !== 'all' || itemSearch) && <button className="planet-filter-reset" onClick={() => { setDirection('all'); setItemSearch(''); }}>Clear filters</button>}
     {direction !== 'exports' && <PlanetTradeSummary entries={imports} direction="imports" items={items}/>}
@@ -197,7 +198,7 @@ export function Design({ catalog }: { catalog: Catalog }) {
     </button>;
   }
   return <div className="design-workspace">
-    <aside className="design-locations"><div className="design-section-heading"><h2>Logistics Network</h2><span>{roots.length} system{roots.length === 1 ? '' : 's'}</span></div><p className="design-intro">Plan your corner of the galaxy.</p>
+    <aside className="design-locations"><div className="design-section-heading"><h2>Logistics Network</h2><span>{roots.length} system{roots.length === 1 ? '' : 's'}</span></div>
       {currentSystem && <div className="design-current-system"><small>Current system</small><strong>✧ {currentSystem.name || 'Unnamed system'}</strong></div>}
       <div className="design-create-buttons">{currentSystem && <button className="design-button" onClick={() => begin('planet', currentSystem.id, 'sidebar')} disabled={!!initial.error}>+ Planet</button>}<button className="design-button" onClick={() => begin('system')} disabled={!!initial.error}>+ System</button></div>
       {creation?.kind === 'planet' && creation.placement === 'sidebar' && creationSystem && <form className="design-create-form" onSubmit={add}><h3>New planet</h3><p className="design-parent-hint">Adding to <strong>{creationSystem.name || 'Unnamed system'}</strong></p><label>Planet name<input autoFocus aria-label="New planet name" value={name} maxLength={120} placeholder="e.g. Homeworld" onChange={event => setName(event.target.value)}/></label><div><button className="design-button" type="submit" disabled={!name.trim()}>Create planet</button><button type="button" onClick={() => setCreation(null)}>Cancel</button></div></form>}
@@ -210,8 +211,8 @@ export function Design({ catalog }: { catalog: Catalog }) {
       {saveError && <div role="alert" className="design-error">{saveError}{!initial.error && <button className="design-button" onClick={() => commit(data)}>Retry saving</button>}</div>}
       {undo && <div className="design-undo">{undo.kind === 'planet' ? 'Planet removed.' : 'System removed.'}<button onClick={() => { const restored = [...data.sections, ...undo.data.sections.filter(s => !data.sections.some(current => current.id === s.id))]; commit({ ...data, sections: restored.filter(s => !s.parentId || restored.some(parent => parent.id === s.parentId)) }); setActiveId(undo.activeId); setUndo(null); }}>Undo</button><button aria-label="Dismiss undo" onClick={() => setUndo(null)}>×</button></div>}
       {active ? <div key={active.id}>
-        <div className="design-editor-top"><div className="eyebrow">{parent ? <><button onClick={() => navigate(parent.id)}>{parent.name || 'Unnamed system'}</button> / PLANET</> : active.kind === 'system' ? 'STAR SYSTEM' : 'PLANET'}</div></div>
-        <div className="system-name-row"><label className="design-name">Name<input aria-label="Section name" value={active.name} maxLength={120} onChange={e => patch({name: e.target.value})} onBlur={() => { if (!active.name.trim()) patch({name: active.kind === 'planet' ? 'Untitled planet' : 'Untitled system'}); }}/></label>{active.kind === 'system' && <button className={`visualize-button ${graphSystem===active.id?'active':''}`} data-tooltip="visualize" aria-label={`Visualize ${active.name}`} aria-pressed={graphSystem===active.id} onClick={()=>setGraphSystem(graphSystem===active.id?null:active.id)}><VisualizeIcon/></button>}</div>
+        <div className="design-editor-top"><div className="eyebrow">{parent ? <><button onClick={() => navigate(parent.id)}>{parent.name || 'Unnamed system'}</button> / {active.name || 'Untitled planet'}</> : active.kind === 'system' ? 'STAR SYSTEM' : 'PLANET'}</div></div>
+        <div className="system-name-row">{active.kind==='planet'?<EditablePlanetName key={active.id} name={active.name} onChange={name=>patch({name})}/>:<label className="design-name">Name<input aria-label="Section name" value={active.name} maxLength={120} onChange={e => patch({name: e.target.value})} onBlur={() => { if (!active.name.trim()) patch({name: active.kind === 'planet' ? 'Untitled planet' : 'Untitled system'}); }}/></label>}{active.kind === 'system' && <button className={`visualize-button ${graphSystem===active.id?'active':''}`} data-tooltip="visualize" aria-label={`Visualize ${active.name}`} aria-pressed={graphSystem===active.id} onClick={()=>setGraphSystem(graphSystem===active.id?null:active.id)}><VisualizeIcon/></button>}</div>
         {active.kind==='system' && graphSystem===active.id ? <SystemGraph key={active.id} planets={children} items={itemLookup} onClose={()=>setGraphSystem(null)}/> : <>
         {active.kind === 'planet' && <Specializations label="Planet type" single tags={active.planetType?[active.planetType]:[]} choices={labelChoices('planetTypes')} onChange={tags=>patch({planetType:tags[0]??''})} onRemember={tag=>rememberLabel('planetTypes',tag)}/>}
         {active.kind === 'planet' && <Specializations tags={active.specializations??[]} choices={labelChoices('specializationTypes')} onChange={specializations=>patch({specializations})} onRemember={tag=>rememberLabel('specializationTypes',tag)}/>}

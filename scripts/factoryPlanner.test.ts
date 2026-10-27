@@ -16,3 +16,17 @@ test('rounding at exact decimal boundaries does not add a belt',()=>{const p=pla
 test('repeat calls are deterministic without mutating input',()=>{const frozen=structuredClone(base);assert.deepEqual(calculateFactory(frozen),calculateFactory(base));assert.deepEqual(frozen,base);});
 
 test('short reach rejects too many dedicated lanes and longer reach resolves it',()=>{const recipe={...base.recipe,inputs:[1,1,2,1,4,1,5,1]};assert.equal(calculateFactory({...base,recipe}).ok,false);assert.equal(plan({recipe,reach:2}).sustainable,6);});
+
+import { normalizePlannerPreferences, updatePlannerPreferences, PLANNER_PREFERENCES_KEY } from '../src/lib/plannerPreferences';
+test('equipment preferences validate saved values and use one last facility',()=>{
+ assert.deepEqual(normalizePlannerPreferences(null),{facilityId:2303,beltId:2001,sorterId:2011,reach:1});
+ assert.deepEqual(normalizePlannerPreferences({facilityId:2317,beltId:2003,sorterId:2013,reach:3}),{facilityId:2317,beltId:2003,sorterId:2013,reach:3});
+ assert.deepEqual(normalizePlannerPreferences({facilityId:999,beltId:-1,sorterId:2014,reach:99}),normalizePlannerPreferences(null));
+});
+test('only equipment choices are persisted, with last facility replacing the previous one',()=>{
+ const data=new Map<string,string>();
+ const previous=Object.getOwnPropertyDescriptor(globalThis,'localStorage');
+ Object.defineProperty(globalThis,'localStorage',{configurable:true,value:{getItem:(key:string)=>data.get(key)??null,setItem:(key:string,value:string)=>data.set(key,value)}});
+ try{updatePlannerPreferences({facilityId:2305,beltId:2003});updatePlannerPreferences({facilityId:2317,reach:2});const saved=JSON.parse(data.get(PLANNER_PREFERENCES_KEY)!);assert.deepEqual(saved,{facilityId:2317,beltId:2003,sorterId:2011,reach:2});}
+ finally{if(previous)Object.defineProperty(globalThis,'localStorage',previous);else Reflect.deleteProperty(globalThis,'localStorage');}
+});

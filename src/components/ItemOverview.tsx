@@ -14,12 +14,12 @@ export function ItemOverview({ item, items }: { item: Item; items: Map<number, I
     const observer = new ResizeObserver(measure); observer.observe(node); measure();
     return () => observer.disconnect();
   }, [item]);
-  if (!item.overview?.length) return <p className="description">No overview is available in the wiki for this item.</p>;
+  if (!item.overview?.length) return <p className="description">No overview has been cached for this item.</p>;
   return <section className="item-overview" aria-label="Overview">
     <div ref={content} id={`overview-${item.id}`} className={`overview-copy ${expanded ? 'expanded' : ''}`}>
       {item.overview.map((paragraph, index) => <p key={index}>{paragraph.map((segment, part) => {
         const linked = segment.itemId ? items.get(segment.itemId) : undefined;
-        if (linked) return <button key={part} className="overview-item" data-tooltip={`Open ${linked.name}`} onClick={() => actions.navigate(linked.id)} {...actions.dragProps(linked.id)}>
+        if (linked) return <button key={part} className="overview-item" onClick={() => actions.navigate(linked.id)} {...actions.dragProps(linked.id)}>
           {linked.icon && <img src={`${import.meta.env.BASE_URL}${linked.icon}`} alt=""/>}{linked.name}</button>;
         return segment.bold ? <strong key={part}>{segment.text}</strong> : <span key={part}>{segment.text}</span>;
       })}</p>)}

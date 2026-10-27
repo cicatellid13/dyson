@@ -2,9 +2,9 @@ import { Children, isValidElement, useEffect, useId, useLayoutEffect, useRef, us
 import { createPortal } from 'react-dom';
 
 /** Select-only combobox; its popup is rendered by the app on every platform. */
-export function ThemedSelect({ children, value, onChange, disabled, className = '', 'aria-label': label }: {
+export function ThemedSelect({ children, value, onChange, disabled, className = '', renderIcon, 'aria-label': label }: {
   children: ReactNode; value: string | number; onChange: (event: { target: { value: string } }) => void;
-  disabled?: boolean; className?: string; 'aria-label'?: string;
+  disabled?: boolean; className?: string; renderIcon?: (value:string)=>ReactNode; 'aria-label'?: string;
 }) {
   const options: { value: string; label: ReactNode }[] = [];
   function collect(nodes: ReactNode) {
@@ -76,12 +76,12 @@ export function ThemedSelect({ children, value, onChange, disabled, className = 
         const index = options.findIndex(option => Children.toArray(option.label).join('').toLowerCase().startsWith(search.current.text));
         if (index >= 0) { setActive(index); setOpen(true); }
       }
-    }}><span>{options[selected]?.label ?? 'Select an option'}</span><span aria-hidden="true">▾</span></button>
+    }}><span className="themed-select-label">{options[selected]&&renderIcon?.(options[selected].value)}{options[selected]?.label ?? 'Select an option'}</span><span aria-hidden="true">▾</span></button>
     {open && createPortal(<div ref={menu} id={id} role="listbox" aria-label={label} className="themed-select-menu" style={style}
       onMouseDown={event => event.preventDefault()}>
       {options.map((option, index) => <div key={option.value} id={`${id}-${index}`} role="option" aria-selected={String(value) === option.value}
         className={`themed-select-option ${active === index ? 'highlighted' : ''}`}
-        onMouseMove={() => setActive(index)} onClick={() => choose(index)}><span>{option.label}</span><span aria-hidden="true">{String(value) === option.value ? '✓' : ''}</span></div>)}
+        onMouseMove={() => setActive(index)} onClick={() => choose(index)}><span className="themed-select-label">{renderIcon?.(option.value)}{option.label}</span><span aria-hidden="true">{String(value) === option.value ? '✓' : ''}</span></div>)}
     </div>, document.body)}
   </>;
 }

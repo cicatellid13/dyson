@@ -91,7 +91,7 @@ export function Planning() {
   return <div className="design-workspace planning-workspace">
     <aside className="design-locations">
       <div className="design-section-heading"><h2>Planning</h2><span>{data.notes.length} {data.notes.length === 1 ? 'note' : 'notes'}</span></div>
-      <p className="design-intro">Ideas, plans, and things to remember.</p>
+
       <div className="design-create-buttons"><button className="design-button" onClick={addNote}>+ {currentFolderId ? 'Note' : 'Scratch'}</button><button className="design-button" onClick={() => setCreatingFolder(true)}>+ Folder</button></div>
       {creatingFolder && <form className="design-create-form" onSubmit={addFolder}><label>Folder name<input autoFocus aria-label="New folder name" value={folderName} maxLength={120} onChange={e => setFolderName(e.target.value)}/></label><div><button className="design-button" disabled={!folderName.trim()}>Create folder</button><button type="button" onClick={() => setCreatingFolder(false)}>Cancel</button></div></form>}
       <nav aria-label="Planning folders and notes">
