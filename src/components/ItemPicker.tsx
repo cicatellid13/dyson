@@ -48,7 +48,7 @@ export function ItemPicker({ items, value, onChange, label, placeholder = 'Searc
     <div className={`item-picker-field ${isDefenseItem(selected) ? 'defense-item' : ''}`} {...(selected?itemActions.dragProps(selected.id):{})}>
       <input ref={input} role="combobox" aria-label={label} aria-autocomplete="list" aria-expanded={open}
         aria-controls={listId} aria-activedescendant={open && active >= 0 && matches[active] ? `${listId}-${matches[active].id}` : undefined}
-        autoComplete="off" title={value || placeholder} value={value} placeholder={placeholder}
+        autoComplete="off" data-tooltip={value || placeholder} value={value} placeholder={placeholder}
         onFocus={() => setOpen(true)} onClick={() => setOpen(true)}
         onChange={event => { onChange(event.target.value); setActive(-1); setOpen(true); }}
         onKeyDown={event => {

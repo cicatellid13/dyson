@@ -115,3 +115,15 @@ test('removing only one linked side preserves and unlinks the opposite entry',()
  assert.equal(remaining.length,1);assert.equal(remaining[0].linkId,undefined);assert.equal(remaining[0].amount,'30');
  assert.equal(linked.sections.find(s=>s.id===a.id).exports.length,1);
 });
+
+test('cross-system exports create a matching import and keep paired edits synchronized',()=>{
+ const alpha=createSection('Alphecca','system'),sadira=createSection('Sadira','system');
+ const a=createSection('Alphecca I','planet',alpha.id),b=createSection('Sadira I','planet',sadira.id);
+ a.exports=[{id:'acid',itemId:1116,amount:'',unit:'items/min',destination:'',planetId:b.id}];
+ let data=linkRoute({version:1,sections:[alpha,sadira,a,b]},a.id,'exports','acid');
+ const source=data.sections.find(s=>s.id===a.id);
+ assert.equal(data.sections.find(s=>s.id===b.id).imports[0].planetId,a.id);
+ data=updateTrades(data,a.id,'exports',source.exports.map(e=>({...e,amount:'120'})));
+ assert.equal(data.sections.find(s=>s.id===b.id).imports[0].amount,'120');
+ assert.equal(routeReadiness(data.sections,a.id,'exports',data.sections.find(s=>s.id===a.id).exports[0]).ready,true);
+});

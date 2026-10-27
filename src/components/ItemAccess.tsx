@@ -7,11 +7,11 @@ export function useItemAccess(){
 }
 export function ItemJump({id,name}:{id:number;name?:string}){
  const actions=useItemAccess();
- return <button type="button" className="item-jump" aria-label={`Open ${name??'item'}`} title={`Open ${name??'item'}`} onClick={event=>{event.preventDefault();event.stopPropagation();actions.navigate(id);}}>↗</button>;
+ return <button type="button" className="item-jump" aria-label={`Open ${name??'item'}`} data-tooltip={`Open ${name??'item'}`} onClick={event=>{event.preventDefault();event.stopPropagation();actions.navigate(id);}}>↗</button>;
 }
 export function ItemAccess({id,name,children}:{id:number;name?:string;children:ReactNode}){
  const actions=useItemAccess();
  return <span className="item-access" {...actions.dragProps(id)}>{children}<ItemJump id={id} name={name}/></span>;
 }
 
-export function ItemLink({id,name,children}:{id:number;name?:string;children:ReactNode}){const actions=useItemAccess();return <button type="button" className="logistics-item-link" title={`Open ${name??'item'}`} {...actions.dragProps(id)} onClick={()=>actions.navigate(id)}>{children}</button>;}
+export function ItemLink({id,name,children}:{id:number;name?:string;children:ReactNode}){const actions=useItemAccess();return <button type="button" className="logistics-item-link" data-tooltip={`Open ${name??'item'}`} {...actions.dragProps(id)} onClick={()=>actions.navigate(id)}>{children}</button>;}

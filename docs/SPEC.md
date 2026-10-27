@@ -236,3 +236,7 @@ Import/export item pickers use custom dark menus with item names on the left and
 - Planet route hit areas are separate siblings: a content-sized item link, an invisible flexible middle expansion button, and the Advanced/remove/disclosure controls. The item link must never stretch across the expansion area.
 
 - Linked routes replace explanatory prose with two compact bordered planet buttons: red crosses on both planets remove both entries; a cross on only the current planet removes that entry and unlinks but preserves the counterpart. Tooltips describe each action. Create-route uses the same compact button sizing.
+
+- Import and export planet selectors both allow any existing system, including linked routes, while excluding the current planet. Cross-system exports support creating/linking the matching import and synchronized paired edits. Clicking an already-open system’s sidebar Visualize button closes the graph exactly like Back to details.
+
+- App-wide tooltips use a dark background and light text, appear after 100ms on hover/focus, stay inside the viewport, and dismiss on click, scroll, Escape, or blur. Rich route summaries retain their immediate themed popup.

@@ -81,3 +81,5 @@ input:not([type=checkbox]):not([type=radio]),textarea,[contenteditable=true]{cur
 .sidebar footer .sidebar-wiki{display:block;font-size:inherit;margin-bottom:8px;color:#b9d9c5}
 
 [draggable=true].drag-held,[draggable=true].drag-held *{cursor:grabbing!important}
+
+.app-tooltip{position:fixed;z-index:10000;max-width:min(320px,calc(100vw - 16px));padding:8px 11px;border:1px solid #47635b;border-radius:6px;background:#0b171b;color:#e2eee9;font-size:12px;font-weight:400;line-height:1.45;box-shadow:0 5px 18px #0008;pointer-events:none;overflow-wrap:anywhere}
