@@ -1,0 +1,3 @@
+export function RemoveRouteIcon({both}:{both:boolean}) {
+ return <svg width="78" height="32" viewBox="0 0 120 48" fill="none" aria-hidden="true"><g stroke="#78dfb8" strokeWidth="2.4"><circle cx="21" cy="22" r="14" fill="#65cba5" fillOpacity=".45"/><ellipse cx="21" cy="22" rx="20" ry="6" transform="rotate(-30 21 22)"/></g><path d="M49 23h16" stroke="#8fbcae" strokeWidth="2" strokeDasharray="3 3"/><g stroke="#54d7f1" strokeWidth="2.4"><circle cx="91" cy="22" r="16"/><ellipse cx="91" cy="22" rx="23" ry="7" transform="rotate(-30 91 22)"/></g>{[34,...(both?[105]:[])].map(x=><g key={x}><circle cx={x} cy="36" r="11" fill="#283a35"/><path d={`m${x-5} 31 10 10m0-10-10 10`} stroke="#ef929e" strokeWidth="3" strokeLinecap="round"/></g>)}</svg>;
+}

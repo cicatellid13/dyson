@@ -54,7 +54,7 @@
 
 .app-version{display:block;flex-shrink:0;padding:9px 10px 0;color:#819397;font-size:10px;line-height:1.3;letter-spacing:.4px;font-variant-numeric:tabular-nums;user-select:text}
 
-.ingredient[draggable=true]{cursor:grab}.ingredient[draggable=true]:active{cursor:grabbing}.favorite-drop-ready{outline:1px dashed #7eae91;outline-offset:-3px}.favorite-drop-active{background:#244335!important;outline:2px solid #b5e6c4;outline-offset:-3px}.favorite-drop-notice{position:fixed;bottom:22px;left:240px;z-index:100;background:#20392c;border:1px solid #66977a;border-radius:7px;padding:12px 18px;color:#d8efdf;font-size:12px;box-shadow:0 8px 24px #0006;pointer-events:none}
+.ingredient[draggable=true]{cursor:grab}.favorite-drop-ready{outline:1px dashed #7eae91;outline-offset:-3px}.favorite-drop-active{background:#244335!important;outline:2px solid #b5e6c4;outline-offset:-3px}.favorite-drop-notice{position:fixed;bottom:22px;left:240px;z-index:100;background:#20392c;border:1px solid #66977a;border-radius:7px;padding:12px 18px;color:#d8efdf;font-size:12px;box-shadow:0 8px 24px #0006;pointer-events:none}
 
 .favorite-item-row{gap:4px}.favorite-item-open{display:flex;align-items:center;gap:12px;flex:1;min-width:0;text-align:left;padding:0}.favorite-item-open>span:last-child{min-width:0;overflow-wrap:anywhere}.favorite-remove{display:flex;align-items:center;justify-content:center;flex-shrink:0;width:28px;height:28px;border-radius:5px;color:#94aaa0}.favorite-remove:hover{background:#613a384d;color:#edb0a7}
 
@@ -76,7 +76,8 @@ html,body,button,a,[role=button],[role=option],[role=tab],label,input[type=check
 button:hover,a:hover,[draggable=true]{cursor:url('../assets/nebula.svg') 3 3, pointer}input:not([type=checkbox]):not([type=radio]),textarea,[contenteditable=true]{cursor:text}button:disabled{cursor:not-allowed}
 input:not([type=checkbox]):not([type=radio]),textarea,[contenteditable=true]{cursor:url('../assets/nebula-text.svg') 9 13,text;caret-color:#84edfa}
 [draggable=true],.ingredient[draggable=true],.favorite-item-row[draggable],.item-access,.planning-folder-link[draggable],.planning-note-link[draggable],.design-location[draggable]{cursor:url('../assets/nebula.svg') 3 3,auto}
-[draggable=true]:active,.ingredient[draggable=true]:active,.planning-folder-link[draggable]:active,.planning-note-link[draggable]:active,.design-location[draggable]:active{cursor:grabbing}
 .logistics-item-link{display:inline-flex;align-items:center;gap:8px;min-width:0;text-align:left;padding:3px 0;color:inherit}.logistics-item-link:hover{color:#bce9c8}.logistics-item-link img{width:28px;height:28px;object-fit:contain}.input-access-row>.logistics-item-link,.planet-trade-row>.logistics-item-link,.graph-resource>.logistics-item-link{flex:1}.trade-options-toggle{padding:8px;color:#91b5a2}.logistics-item-link strong{font-size:12px}
 
 .sidebar footer .sidebar-wiki{display:block;font-size:inherit;margin-bottom:8px;color:#b9d9c5}
+
+[draggable=true].drag-held,[draggable=true].drag-held *{cursor:grabbing!important}

@@ -1,5 +1,5 @@
 export type PlanningFolder = { id: string; name: string; order?: number };
-export const todoTypes = ['import','export','production','power','issue'] as const;
+export const todoTypes = ['import','export','production','power','issue','other'] as const;
 export type TodoType = typeof todoTypes[number];
 export type ChecklistItem = { type?:TodoType; id:string; text:string; done:boolean };
 export type PlanningNote = { checklist?: ChecklistItem[]; id: string; folderId: string | null; title: string; body: string; order?: number };

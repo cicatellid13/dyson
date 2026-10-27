@@ -5,8 +5,8 @@ export function NoteChecklist({entries,onChange}:{entries:ChecklistItem[];onChan
  const [filter,setFilter]=useState<TodoType|'all'|'untyped'>('all');
  const visible=entries.filter(entry=>filter==='all'||(filter==='untyped'?!entry.type:entry.type===filter));
  const filters=['all',...todoTypes,...(entries.some(entry=>!entry.type)?['untyped' as const]:[])] as const;
- const labels={all:'All',import:'Import',export:'Export',production:'Production',power:'Power',issue:'Issue',untyped:'Other'};
- const symbols={all:'▦',production:'⚙',power:'ϟ',issue:'!',untyped:'•'};
+ const labels={all:'All',import:'Import',export:'Export',production:'Production',power:'Power',issue:'Issue',other:'Other',untyped:'Untyped'};
+ const symbols={all:'▦',production:'⚙',power:'ϟ',issue:'!',other:'•••',untyped:'•'};
  const [choosing,setChoosing]=useState(false);
  const [newId,setNewId]=useState<string|null>(null);
  function add(type:TodoType){const id=crypto.randomUUID();onChange([...entries,{id,type,text:'',done:false}]);setNewId(id);setChoosing(false);setFilter(type);}

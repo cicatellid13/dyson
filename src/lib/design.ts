@@ -20,7 +20,7 @@ export type DesignSection = {
   imports: TradeEntry[];
   exports: TradeEntry[];
 };
-export type DesignData = { version: 1; sections: DesignSection[] };
+export type DesignData = { version: 1; planetTypes?: string[]; specializationTypes?: string[]; sections: DesignSection[] };
 export const emptyDesign = (): DesignData => ({ version: 1, sections: [] });
 export function createSection(name: string, kind: DesignSection['kind'], parentId: string | null = null): DesignSection {
   if (kind === 'planet' && !parentId) throw Error('Choose a system before creating a planet.');
@@ -34,6 +34,10 @@ export function parseDesign(raw: string | null): DesignData {
   if (raw === null) return emptyDesign();
   const data = JSON.parse(raw) as DesignData;
   if (data?.version !== 1 || !Array.isArray(data.sections)) throw Error('Unsupported design data.');
+  for (const key of ['planetTypes','specializationTypes'] as const) {
+    const values=data[key];
+    if(values!==undefined && (!Array.isArray(values)||values.length>1000||values.some(v=>typeof v!=='string'||!v.trim()||v.length>(key==='planetTypes'?120:40)))) throw Error('Invalid saved planet labels.');
+  }
   const ids = new Set<string>();
   for (const s of data.sections) {
     if (!s || typeof s.id !== 'string' || ids.has(s.id) || !['planet', 'system'].includes(s.kind) ||
@@ -87,12 +91,30 @@ export function updateTrades(data: DesignData, ownerId: string, direction: 'impo
   return {...data,sections};
 }
 export function linkExport(data: DesignData, ownerId: string, entryId: string): DesignData {
-  const owner=data.sections.find(s=>s.id===ownerId&&s.kind==='planet');
-  const entry=owner?.exports.find(e=>e.id===entryId);
-  const target=data.sections.find(s=>s.id===entry?.planetId&&s.kind==='planet');
-  if(!owner||!entry||entry.linkId||!target||target.id===owner.id||target.parentId!==owner.parentId)return data;
-  // Reuse only an exact counterpart; never overwrite a separately planned rate.
-  const match=target.imports.find(e=>!e.linkId&&e.itemId===entry.itemId&&e.planetId===owner.id&&e.amount===entry.amount&&e.unit===entry.unit);
-  const linkId=crypto.randomUUID();
-  return {...data,sections:data.sections.map(s=>s.id===owner.id?{...s,exports:s.exports.map(e=>e.id===entryId?{...e,linkId}:e)}:s.id===target.id?{...s,imports:match?s.imports.map(e=>e.id===match.id?{...e,linkId}:e):[...s.imports,{...entry,id:crypto.randomUUID(),linkId,planetId:owner.id,destination:''}]}:s)};
+ return linkRoute(data,ownerId,'exports',entryId);
+}
+export function linkRoute(data: DesignData, ownerId: string, direction:'imports'|'exports', entryId: string): DesignData {
+ const owner=data.sections.find(s=>s.id===ownerId&&s.kind==='planet');
+ const entry=owner?.[direction].find(e=>e.id===entryId);
+ const target=data.sections.find(s=>s.id===entry?.planetId&&s.kind==='planet');
+ if(!owner||!entry||entry.linkId||!target||target.id===owner.id)return data;
+ const opposite=direction==='imports'?'exports':'imports';
+ const match=target[opposite].find(e=>!e.linkId&&e.itemId===entry.itemId&&e.planetId===owner.id&&e.amount===entry.amount&&e.unit===entry.unit);
+ const linkId=crypto.randomUUID();
+ return {...data,sections:data.sections.map(s=>s.id===owner.id?{...s,[direction]:s[direction].map(e=>e.id===entryId?{...e,linkId}:e)}:s.id===target.id?{...s,[opposite]:match?s[opposite].map(e=>e.id===match.id?{...e,linkId}:e):[...s[opposite],{...entry,id:crypto.randomUUID(),linkId,planetId:owner.id,destination:''}]}:s)};
+}
+
+export function routeReadiness(sections: DesignSection[], ownerId: string | undefined, direction: 'imports'|'exports', entry: TradeEntry) {
+  const peer=sections.find(s=>s.id===entry.planetId&&s.kind==='planet'&&s.id!==ownerId);
+  if(!peer) return {ready:false,message:`Choose a ${direction==='imports'?'source':'destination'} planet.`};
+  const opposite=direction==='imports'?'exports':'imports';
+  const ready=peer[opposite].some(e=>e.itemId===entry.itemId&&e.planetId===ownerId);
+  return {ready,message:ready?`${peer.name} has the matching ${opposite==='exports'?'export':'import'}.`:`${peer.name} has no matching ${opposite==='exports'?'export to':'import from'} this planet.`};
+}
+
+export function removeRouteSide(data:DesignData,ownerId:string,direction:'imports'|'exports',entryId:string):DesignData {
+ const entry=data.sections.find(s=>s.id===ownerId)?.[direction].find(e=>e.id===entryId);
+ if(!entry)return data;
+ const opposite=direction==='imports'?'exports':'imports';
+ return {...data,sections:data.sections.map(s=>({...s,[direction]:s.id===ownerId?s[direction].filter(e=>e.id!==entryId):s[direction],[opposite]:entry.linkId?s[opposite].map(e=>{if(e.linkId!==entry.linkId)return e;const {linkId,...unlinked}=e;return unlinked;}):s[opposite]}))};
 }

@@ -217,3 +217,22 @@ Import/export item pickers use custom dark menus with item names on the left and
 - Logistics item links open a standalone item detail page regardless of the default catalog layout. Standalone detail has one “← Grid” return button and no history button. The sidebar wiki link below cloud status follows the last viewed item, including while in Planning or Logistics Network.
 
 - To-do creation uses a centered vector plus and an icon-only close button aligned with the task-type choices; both retain accessible labels and tooltips.
+
+- The drag hand appears only after a 250ms mouse hold on a draggable surface. Quick clicks retain the normal cursor. Release, cancellation, blur, and native drag start/end clear the pending hold state.
+
+- To-do types include Other, represented by an ellipsis.
+- Item navigation remembers its origin. A grid entry initially shows ← Grid; deeper navigation shows Back and a return-to-grid icon. Logistics item links open standalone details and Back restores the selected planet/system through session state.
+- Planet routes offer collapsed-row removal and informational reciprocal-route status (green check or red circled x with explanatory tooltip). Rates are hidden behind Advanced. These controls never require the opposite route to exist.
+- Systems show notes above planet cards, with no system-level route editors. Existing saved system route data is preserved.
+- Planet type is a single selectable/addable tag. Specializations are multiple tags. Custom suggestions are retained in the shared workspace, validated, patched to Mongo, and merged additively between devices even after assignments are removed.
+
+- Planet route names/icons alone navigate; the empty row area expands options. Advanced uses a precision-sliders icon. Hover/focus on the ringed-planet route status reveals a themed mismatch summary with item icons and explanations. Both import and export selectors offer explicit creation/linking of their matching route, including existing cross-system imports.
+
+- Route readiness appears once beside each Imports/Exports heading, summarizing all visible entries; individual item rows have no status planet icon. Empty lists omit the status icon.
+
+- Matching-route creation uses a mint outlined rounded button with linked green/cyan planet artwork, a concise Create import/export label, and 16px spacing below the planet selector.
+
+- Matching-route creation is icon-only: green source planet, arrow, cyan destination planet and mint plus badge; accessible name/tooltip identify the action. The middle-row expansion target is a transparent overlay with no layout footprint, leaving item names their available width.
+- Planet route hit areas are separate siblings: a content-sized item link, an invisible flexible middle expansion button, and the Advanced/remove/disclosure controls. The item link must never stretch across the expansion area.
+
+- Linked routes replace explanatory prose with two compact bordered planet buttons: red crosses on both planets remove both entries; a cross on only the current planet removes that entry and unlinks but preserves the counterpart. Tooltips describe each action. Create-route uses the same compact button sizing.

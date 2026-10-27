@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 const compiled = ts.transpileModule(readFileSync(new URL('../src/lib/design.ts', import.meta.url), 'utf8'), {compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;
-const { createSection, parseDesign, removeSection, linkExport, updateTrades } = await import('data:text/javascript;base64,' + Buffer.from(compiled).toString('base64'));
+const { createSection, parseDesign, removeSection, linkExport, linkRoute, updateTrades, routeReadiness, removeRouteSide } = await import('data:text/javascript;base64,' + Buffer.from(compiled).toString('base64'));
 test('systems, planets, notes and independent trade lists survive persistence', () => {
  const system = createSection('  Home system  ', 'system');
  const planet = createSection('Forge', 'planet', system.id);
@@ -77,4 +77,41 @@ test('linking preserves unrelated planned imports and reuses exact matches',()=>
  const data=linkExport({version:1,sections:[system,a,b]},a.id,'export');
  assert.equal(data.sections[2].imports.length,1);assert.equal(data.sections[2].imports[0].id,'existing');
  assert.deepEqual(parseDesign(JSON.stringify(data)).sections[1].specializations,['Science','Smelting']);
+});
+
+test('route readiness requires the matching resource and reciprocal endpoint without modifying routes',()=>{
+ const system=createSection('Sol','system'),a=createSection('A','planet',system.id),b=createSection('B','planet',system.id);
+ const route={id:'route',itemId:1001,amount:'',unit:'items/min',destination:'',planetId:b.id};
+ const sections=[system,a,b];
+ assert.equal(routeReadiness(sections,a.id,'exports',route).ready,false);
+ b.imports=[{...route,planetId:'another'}];
+ assert.equal(routeReadiness(sections,a.id,'exports',route).ready,false);
+ b.imports=[{...route,planetId:a.id}];
+ assert.equal(routeReadiness(sections,a.id,'exports',route).ready,true);
+ b.exports=[{...route,planetId:a.id}];
+ assert.equal(routeReadiness(sections,a.id,'imports',route).ready,true);
+ assert.equal(routeReadiness(sections,a.id,'imports',{...route,planetId:undefined}).ready,false);
+ assert.equal(a.exports.length,0);
+});
+
+test('matching export can be created from an import, including across systems',()=>{
+ const sol=createSection('Sol','system'),alpha=createSection('Alpha','system');
+ const a=createSection('A','planet',sol.id),b=createSection('B','planet',alpha.id);
+ a.imports=[{id:'import',itemId:1001,amount:'30',unit:'items/min',destination:'',planetId:b.id}];
+ let data=linkRoute({version:1,sections:[sol,alpha,a,b]},a.id,'imports','import');
+ assert.equal(data.sections.find(s=>s.id===b.id).exports[0].planetId,a.id);
+ assert.equal(routeReadiness(data.sections,a.id,'imports',data.sections.find(s=>s.id===a.id).imports[0]).ready,true);
+ data=linkRoute(data,a.id,'imports','import');
+ assert.equal(data.sections.find(s=>s.id===b.id).exports.length,1);
+});
+
+test('removing only one linked side preserves and unlinks the opposite entry',()=>{
+ const system=createSection('Sol','system'),a=createSection('A','planet',system.id),b=createSection('B','planet',system.id);
+ a.exports=[{id:'out',itemId:1001,amount:'30',unit:'items/min',destination:'',planetId:b.id}];
+ const linked=linkRoute({version:1,sections:[system,a,b]},a.id,'exports','out');
+ const next=removeRouteSide(linked,a.id,'exports','out');
+ assert.equal(next.sections.find(s=>s.id===a.id).exports.length,0);
+ const remaining=next.sections.find(s=>s.id===b.id).imports;
+ assert.equal(remaining.length,1);assert.equal(remaining[0].linkId,undefined);assert.equal(remaining[0].amount,'30');
+ assert.equal(linked.sections.find(s=>s.id===a.id).exports.length,1);
 });

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { mergeWorkspace, encode, workspacePatch } from '../electron/backend/merge';
+import { mergeWorkspace, encode, decode, workspacePatch } from '../electron/backend/merge';
 import { Persistence } from '../electron/backend/persistence';
 import { emptyWorkspace, type Workspace } from '../src/lib/workspace';
 import type { Database } from '../electron/backend/database';
@@ -154,4 +154,15 @@ test('checklist tasks and specializations survive storage and merge independent 
  assert.equal(merged.planning.notes[0].body,'Keep this text');
  assert.equal(merged.planning.notes[0].checklist![0].type,'production');
  assert.equal(merged.design.sections[0].notes,'Other change');
+});
+
+test('saved planet labels persist and merge across machines independently of planet assignments',()=>{
+ const base=fixture(),local=copy(base),remote=copy(base);
+ local.design.planetTypes=['Crystal world'];remote.design.planetTypes=['Ocean world'];
+ local.design.specializationTypes=['Antimatter'];
+ const merged=mergeWorkspace(base,local,remote);
+ assert.deepEqual(merged.design.planetTypes,['Crystal world','Ocean world']);
+ assert.deepEqual(decode(encode(merged)).design.specializationTypes,['Antimatter']);
+ const patch=workspacePatch(encode(base),encode(merged));
+ assert.deepEqual(patch.set['data.planetTypes'],['Crystal world','Ocean world']);
 });

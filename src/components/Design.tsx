@@ -1,5 +1,7 @@
+import { RemoveRouteIcon } from './RemoveRouteIcon';
+import { AdvancedIcon, RouteStatus } from './RouteStatus';
 import { themeDrag } from '../lib/dragAppearance';
-import { linkExport, updateTrades } from '../lib/design';
+import { linkRoute, updateTrades, routeReadiness, removeRouteSide } from '../lib/design';
 import { PlanetTags, Specializations } from './Specializations';
 import { useSessionExpansion, useSessionSelection } from '../lib/sessionExpansion';
 import { ThemedSelect } from './ThemedSelect';
@@ -20,12 +22,14 @@ function TradeList({ direction, entries, items, sections, onChange, collapsible 
 }) {
   const itemActions = useItemAccess();
   const [expandedEntries, setExpandedEntries] = useSessionExpansion('logistics-entries');
+  const [advanced,setAdvanced]=useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
   const [message, setMessage] = useState('');
   const label = direction === 'imports' ? 'Imports' : 'Exports';
   const sortedItems = useMemo(() => [...items].sort((a,b) => a.name.localeCompare(b.name)), [items]);
   const lookup = useMemo(() => new Map(items.map(item => [item.id, item])), [items]);
   const orderedEntries = entries.filter(entry => lookup.has(entry.itemId)).sort((a,b) => (lookup.get(a.itemId)?.name ?? '').localeCompare(lookup.get(b.itemId)?.name ?? ''));
+      const issues=orderedEntries.map(row=>({id:row.id,item:lookup.get(row.itemId),...routeReadiness(sections,currentPlanetId,direction,row)})).filter(row=>!row.ready);
   function patch(id: string, changes: Partial<TradeEntry>) { onChange(entries.map(entry => entry.id === id ? { ...entry, ...changes } : entry)); }
   function add(event: React.FormEvent) {
     event.preventDefault();
@@ -37,7 +41,7 @@ function TradeList({ direction, entries, items, sections, onChange, collapsible 
     setSearch(''); setMessage('');
   }
   return <section className="trade-panel" aria-label={label}>
-    <div className="design-section-heading"><h3><LogisticsArrow direction={direction}/> {label}</h3><span>{orderedEntries.length} entries</span></div>
+    <div className="design-section-heading"><h3><LogisticsArrow direction={direction}/> {label}{orderedEntries.length>0&&<RouteStatus ready={!issues.length} message={issues.length?`${issues.length} ${direction} need matching routes.`:`All ${direction} have matching routes.`} direction={direction} issues={issues}/>}</h3><span>{orderedEntries.length} entries</span></div>
     <form className="trade-add" onSubmit={add}>
       <ItemPicker label={`Add ${direction} item`} items={sortedItems} value={search} onChange={value => { setSearch(value); setMessage(''); }}/>
       <button type="submit" className="design-button" disabled={!search.trim()}>+ Add</button>
@@ -45,18 +49,24 @@ function TradeList({ direction, entries, items, sections, onChange, collapsible 
     {message && <p role="alert" className="design-warning">{message}</p>}
     <div className="trade-entries">{orderedEntries.map(entry => {
       const item = lookup.get(entry.itemId);
+      const toggle=()=>setExpandedEntries(current=>{const next=new Set(current);if(next.has(entry.id))next.delete(entry.id);else next.add(entry.id);return next;});
       return <div className="trade-entry" key={entry.id}>
-        <div className="input-access-row" {...itemActions.dragProps(entry.itemId)}>
+        <div className="input-access-row planet-route-heading" {...itemActions.dragProps(entry.itemId)}>
         <ItemLink id={entry.itemId} name={item?.name}>{item?.icon&&<img className="item-icon" src={`${import.meta.env.BASE_URL}${item.icon}`} alt=""/>}<strong>{item?.name??`Item ${entry.itemId}`}</strong></ItemLink>
-        {collapsible&&<button type="button" className="trade-options-toggle" aria-label={`Edit ${item?.name} ${direction} options`} aria-expanded={expandedEntries.has(entry.id)} onClick={()=>setExpandedEntries(current=>{const next=new Set(current);if(next.has(entry.id))next.delete(entry.id);else next.add(entry.id);return next;})}>{expandedEntries.has(entry.id)?'▾':'▸'}</button>}</div>
-        {(!collapsible || expandedEntries.has(entry.id)) && <div className="trade-entry-options"><div className="trade-quantity">
+        <button className="route-expand-space" type="button" aria-label={`Expand ${item?.name} ${direction}`} aria-expanded={expandedEntries.has(entry.id)} onClick={toggle}/>
+
+        <button type="button" className="trade-options-toggle" title="advanced" aria-label={`Advanced ${item?.name} ${direction}`} aria-expanded={advanced.has(entry.id)} onClick={()=>setAdvanced(current=>{const next=new Set(current);if(next.has(entry.id))next.delete(entry.id);else next.add(entry.id);return next;})}><AdvancedIcon/></button>
+        <button type="button" className="trade-options-toggle" title={entry.linkId?'Remove linked item from both planets':'Remove item'} aria-label={`Remove ${item?.name} from ${direction}`} onClick={()=>onChange(entries.filter(e=>e.id!==entry.id))}>×</button>
+        {collapsible&&<button type="button" className="trade-options-toggle" aria-label={`Edit ${item?.name} ${direction} options`} aria-expanded={expandedEntries.has(entry.id)} onClick={toggle}>{expandedEntries.has(entry.id)?'▾':'▸'}</button>}</div>
+        {advanced.has(entry.id) && <div className="trade-quantity">
           <label>Amount<input aria-label={`${item?.name} ${direction} amount`} type="number" min="0" step="any" placeholder="Optional" value={entry.amount} onChange={e => { if (e.target.value === '' || Number(e.target.value) >= 0) patch(entry.id, { amount: e.target.value }); }}/></label>
           <label>Unit<ThemedSelect aria-label={`${item?.name} ${direction} unit`} value={entry.unit} onChange={e => patch(entry.id, { unit: e.target.value as TradeEntry['unit'] })}><option>items/min</option><option>items/s</option><option>items</option></ThemedSelect></label>
-        </div>
-        <PlanetPicker excludedPlanetId={currentPlanetId} lockedSystemId={direction==='exports'?exportSystemId:entry.linkId?sections.find(s=>s.id===currentPlanetId)?.parentId??undefined:undefined} sections={sections} planetId={entry.planetId} legacyName={entry.destination} label={`${item?.name} ${direction}`} direction={direction === 'imports' ? 'From' : 'To'} onChange={planetId => patch(entry.id, { planetId, destination: '' })}/>
-        {currentPlanetId && direction==='exports' && !entry.linkId && sections.some(s=>s.id===entry.planetId&&s.parentId===exportSystemId&&s.id!==currentPlanetId) && <button className="design-button" onClick={()=>updateWorkspace(current=>({...current,design:linkExport(current.design,currentPlanetId,entry.id)}))}>Create / link matching import</button>}
-        {entry.linkId && <p className="note">Linked route · Changes sync to the other planet. Removing this item removes both sides.</p>}
-        <button type="button" className="design-remove trade-entry-remove" aria-label={`Remove ${item?.name ?? 'item'} from ${direction}`} onClick={() => onChange(entries.filter(e => e.id !== entry.id))}>Remove item</button>
+        </div>}
+        {(!collapsible || expandedEntries.has(entry.id)) && <div className="trade-entry-options"><PlanetPicker excludedPlanetId={currentPlanetId} lockedSystemId={entry.linkId?sections.find(s=>s.id===entry.planetId)?.parentId??undefined:direction==='exports'?exportSystemId:undefined} sections={sections} planetId={entry.planetId} legacyName={entry.destination} label={`${item?.name} ${direction}`} direction={direction === 'imports' ? 'From' : 'To'} onChange={planetId => patch(entry.id, { planetId, destination: '' })}/>
+        {currentPlanetId && !entry.linkId && sections.some(s=>s.kind==='planet'&&s.id===entry.planetId&&s.id!==currentPlanetId) && <button type="button" className="create-matching-route" aria-label={`Create ${direction==='exports'?'import':'export'}`} title={`Create or link the matching ${direction==='exports'?'import':'export'} on the selected planet`} onClick={()=>updateWorkspace(current=>({...current,design:linkRoute(current.design,currentPlanetId,direction,entry.id)}))}><svg className="matching-route-icon" width="120" height="48" viewBox="0 0 120 48" fill="none" aria-hidden="true"><g stroke="#78dfb8" strokeWidth="2.4"><circle cx="21" cy="24" r="14" fill="#65cba5" fillOpacity=".8"/><ellipse cx="21" cy="24" rx="21" ry="6" transform="rotate(-30 21 24)"/></g><path d="M48 24h19m-6-6 6 6-6 6" stroke="#78dfb8" strokeWidth="2.7" strokeLinecap="round" strokeLinejoin="round"/><g stroke="#54d7f1" strokeWidth="2.4"><circle cx="92" cy="21" r="17"/><ellipse cx="92" cy="21" rx="25" ry="7" transform="rotate(-30 92 21)"/></g><circle cx="106" cy="36" r="12" fill="#68ddb2" stroke="#173f34" strokeWidth="2"/><path d="M100 36h12m-6-6v12" stroke="#16483d" strokeWidth="2.5" strokeLinecap="round"/></svg></button>}
+
+        {entry.linkId && currentPlanetId && <div className="linked-route-actions"><button type="button" className="route-action-button" title="Remove this item from both planets" aria-label={`Remove ${item?.name} from both planets`} onClick={()=>onChange(entries.filter(e=>e.id!==entry.id))}><RemoveRouteIcon both/></button><button type="button" className="route-action-button" title="Remove only this side; keep the other planet’s item" aria-label={`Remove ${item?.name} only from this planet`} onClick={()=>updateWorkspace(current=>({...current,design:removeRouteSide(current.design,currentPlanetId,direction,entry.id)}))}><RemoveRouteIcon both={false}/></button></div>}
+
         </div>}
       </div>;
     })}</div>
@@ -146,6 +156,13 @@ export function Design({ catalog }: { catalog: Catalog }) {
   function patch(changes: Partial<DesignSection>) {
     commit({ ...data, sections: data.sections.map(s => s.id === activeId ? { ...s, ...changes } : s) });
   }
+  function labelChoices(key:'planetTypes'|'specializationTypes') {
+    const values=[...(key==='planetTypes'?['Lava','Ocean','Gas giant']:['Smelting','Science','Dyson components','Mining','Fuel','Manufacturing']),...(data[key]??[]),...data.sections.flatMap(s=>key==='planetTypes'?(s.planetType?[s.planetType]:[]):s.specializations??[])];
+    return values.filter((v,i)=>values.findIndex(other=>other.toLowerCase()===v.toLowerCase())===i);
+  }
+  function rememberLabel(key:'planetTypes'|'specializationTypes',tag:string) {
+    updateWorkspace(current=>({...current,design:{...current.design,[key]:[...new Set([...(current.design[key]??[]),...labelChoices(key),tag])]}}));
+  }
   function begin(kind: DesignSection['kind'], parentId: string | null = null, placement: 'sidebar' | 'inline' = 'inline') {
     if (kind === 'planet' && !roots.some(system => system.id === parentId)) return;
     setCreation({kind, parentId, placement}); setName('');
@@ -196,13 +213,12 @@ export function Design({ catalog }: { catalog: Catalog }) {
         <div className="design-editor-top"><div className="eyebrow">{parent ? <><button onClick={() => navigate(parent.id)}>{parent.name || 'Unnamed system'}</button> / PLANET</> : active.kind === 'system' ? 'STAR SYSTEM' : 'PLANET'}</div></div>
         <div className="system-name-row"><label className="design-name">Name<input aria-label="Section name" value={active.name} maxLength={120} onChange={e => patch({name: e.target.value})} onBlur={() => { if (!active.name.trim()) patch({name: active.kind === 'planet' ? 'Untitled planet' : 'Untitled system'}); }}/></label>{active.kind === 'system' && <button className={`visualize-button ${graphSystem===active.id?'active':''}`} data-tooltip="visualize" aria-label={`Visualize ${active.name}`} aria-pressed={graphSystem===active.id} onClick={()=>setGraphSystem(graphSystem===active.id?null:active.id)}><VisualizeIcon/></button>}</div>
         {active.kind==='system' && graphSystem===active.id ? <SystemGraph key={active.id} planets={children} items={itemLookup} onClose={()=>setGraphSystem(null)}/> : <>
-        {active.kind === 'planet' && <label className="design-planet-type">Planet type<input aria-label="Planet type" value={active.planetType ?? ''} maxLength={120} placeholder="e.g. Lava, Ocean, Gas giant" onChange={event => patch({planetType:event.target.value})}/></label>}
-        {active.kind === 'planet' && <Specializations key={active.id} tags={active.specializations??[]} onChange={specializations=>patch({specializations})}/>}
+        {active.kind === 'planet' && <Specializations label="Planet type" single tags={active.planetType?[active.planetType]:[]} choices={labelChoices('planetTypes')} onChange={tags=>patch({planetType:tags[0]??''})} onRemember={tag=>rememberLabel('planetTypes',tag)}/>}
+        {active.kind === 'planet' && <Specializations tags={active.specializations??[]} choices={labelChoices('specializationTypes')} onChange={specializations=>patch({specializations})} onRemember={tag=>rememberLabel('specializationTypes',tag)}/>}
         {active.kind === 'planet' && !parent && <div className="design-assignment"><label>Assign to a system<ThemedSelect aria-label="Assign planet to system" value="" onChange={event => { if (roots.some(system => system.id === event.target.value)) patch({parentId: event.target.value}); }}><option value="">Select a system</option>{roots.map(system => <option key={system.id} value={system.id}>{system.name}</option>)}</ThemedSelect></label>{!roots.length && <p className="design-empty-small">Create a system using + System, then assign this planet here. Your notes and routes are preserved.</p>}</div>}
-        {active.kind === 'system' && <section className="design-planets"><div className="design-section-heading"><h3>Planets in this system</h3><button className="design-button" onClick={() => begin('planet', active.id)}>+ Add planet</button></div>{creation?.kind === 'planet' && creation.placement === 'inline' && creation.parentId === active.id && <form className="design-create-form design-inline-create" onSubmit={add}><h3>Add planet to {active.name}</h3><label>Planet name<input autoFocus aria-label="New planet name" value={name} maxLength={120} placeholder="e.g. Homeworld" onChange={event => setName(event.target.value)}/></label><div><button className="design-button" type="submit" disabled={!name.trim()}>Create planet</button><button type="button" onClick={() => setCreation(null)}>Cancel</button></div></form>}<div className="design-planet-cards">{children.map(child => <PlanetCard key={`${child.id}-${catalog.items.length}`} planet={child} items={itemLookup} onOpen={() => navigate(child.id)}/>)}</div>{!children.length && <p className="design-empty-small">Add a planet to start mapping this system.</p>}</section>}
         <label className="design-notes">Notes<AutoTextarea aria-label="Section notes" placeholder="Resources, production goals, construction plans…" value={active.notes} onChange={e => patch({notes: e.target.value})}/></label>
-        <div className="design-trade-grid"><TradeList currentPlanetId={active.kind==='planet'?active.id:undefined} collapsible={active.kind==='planet'} key={`imports-${catalog.items.length}`} direction="imports" entries={active.imports} items={catalog.items} sections={data.sections} onChange={imports => updateWorkspace(current=>({...current,design:updateTrades(current.design,active.id,'imports',imports)}))}/><TradeList currentPlanetId={active.kind==='planet'?active.id:undefined} exportSystemId={active.kind==='planet' ? active.parentId ?? undefined : undefined} collapsible={active.kind==='planet'} key={`exports-${catalog.items.length}`} direction="exports" entries={active.exports} items={catalog.items} sections={data.sections} onChange={exports => updateWorkspace(current=>({...current,design:updateTrades(current.design,active.id,'exports',exports)}))}/></div>
-        {active.kind === 'system' && <p className="note">These lists describe this system. Each planet keeps its own notes and trade lists; they are not automatically combined.</p>}
+        {active.kind === 'system' && <section className="design-planets"><div className="design-section-heading"><h3>Planets in this system</h3><button className="design-button" onClick={() => begin('planet', active.id)}>+ Add planet</button></div>{creation?.kind === 'planet' && creation.placement === 'inline' && creation.parentId === active.id && <form className="design-create-form design-inline-create" onSubmit={add}><h3>Add planet to {active.name}</h3><label>Planet name<input autoFocus aria-label="New planet name" value={name} maxLength={120} placeholder="e.g. Homeworld" onChange={event => setName(event.target.value)}/></label><div><button className="design-button" type="submit" disabled={!name.trim()}>Create planet</button><button type="button" onClick={() => setCreation(null)}>Cancel</button></div></form>}<div className="design-planet-cards">{children.map(child => <PlanetCard key={`${child.id}-${catalog.items.length}`} planet={child} items={itemLookup} onOpen={() => navigate(child.id)}/>)}</div>{!children.length && <p className="design-empty-small">Add a planet to start mapping this system.</p>}</section>}
+        {active.kind==='planet'&&<div className="design-trade-grid"><TradeList currentPlanetId={active.kind==='planet'?active.id:undefined} collapsible={active.kind==='planet'} key={`imports-${catalog.items.length}`} direction="imports" entries={active.imports} items={catalog.items} sections={data.sections} onChange={imports => updateWorkspace(current=>({...current,design:updateTrades(current.design,active.id,'imports',imports)}))}/><TradeList currentPlanetId={active.kind==='planet'?active.id:undefined} exportSystemId={active.kind==='planet' ? active.parentId ?? undefined : undefined} collapsible={active.kind==='planet'} key={`exports-${catalog.items.length}`} direction="exports" entries={active.exports} items={catalog.items} sections={data.sections} onChange={exports => updateWorkspace(current=>({...current,design:updateTrades(current.design,active.id,'exports',exports)}))}/></div>}
         <div className="design-delete-area">{deleteId === active.id ? <div role="alert"><p>Delete “{active.name}”{active.kind === 'system' ? ` and its ${children.length} planets` : ''}, including all notes and lists?</p><button className="design-button danger" onClick={confirmRemove}>Delete {active.kind}</button><button onClick={() => setDeleteId(null)}>Cancel</button></div> : <button className="design-remove" onClick={() => setDeleteId(active.id)}>Delete {active.kind}</button>}</div>
         </>}
       </div> : <div className="design-welcome"><span>✧</span><h2>Design your interstellar network.</h2><p>Create a system, add its planets,<br/>and track what comes in and what goes out.</p><button className="design-button" disabled={!!initial.error} onClick={() => begin('system')}>Create your first system</button></div>}
