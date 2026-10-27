@@ -240,3 +240,9 @@ Import/export item pickers use custom dark menus with item names on the left and
 - Import and export planet selectors both allow any existing system, including linked routes, while excluding the current planet. Cross-system exports support creating/linking the matching import and synchronized paired edits. Clicking an already-open system’s sidebar Visualize button closes the graph exactly like Back to details.
 
 - App-wide tooltips use a dark background and light text, appear after 100ms on hover/focus, stay inside the viewport, and dismiss on click, scroll, Escape, or blur. Rich route summaries retain their immediate themed popup.
+
+## Factory Planner
+
+Standalone sidebar entry directly below Logistics Network plus a collapsed item-detail accordion. Both use a shared pure TypeScript rate engine, equipment configuration and calculator UI. Capacity mode sizes one output belt; Infrastructure mode sizes a requested rate. Include per-stream input/output belts and sorters, rounded machine counts, installed capacity, expected output and utilization. Use gauge/blocks mode icons and a factory navigation symbol. Client state only; no persistence or planet/logistics mutations. Mechanics, conservative sorter connection budget, unsupported recipes and acceptance checks are specified in `FACTORY_PLANNER.md`.
+
+Factory Planner session behavior: retain its current item, mode, equipment and target when switching sections, using in-memory component state only; restart clears it. Remove the planner assumptions/footer block from the interface. Shared item dropdowns reopen with all currently allowed items, retain the selected item until edited, and filter only as the user types.

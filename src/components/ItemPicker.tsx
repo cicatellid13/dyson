@@ -9,12 +9,13 @@ export function ItemPicker({ items, value, onChange, label, placeholder = 'Searc
 }) {
   const itemActions = useItemAccess();
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
   const [active, setActive] = useState(-1);
   const listId = useId();
   const [menuStyle, setMenuStyle] = useState<CSSProperties>({ visibility: 'hidden' });
   const list = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
-  const matches = items.filter(item => item.name.toLowerCase().includes(value.trim().toLowerCase()));
+  const matches = items.filter(item => item.name.toLowerCase().includes(query.trim().toLowerCase()));
   const selected = items.find(item => item.name.toLowerCase() === value.trim().toLowerCase());
   useEffect(() => {
     if (open && active >= 0) list.current?.children[active]?.scrollIntoView({ block: 'nearest' });
@@ -40,8 +41,9 @@ export function ItemPicker({ items, value, onChange, label, placeholder = 'Searc
     window.addEventListener('resize', position);
     window.addEventListener('scroll', position, true);
     return () => { window.removeEventListener('resize', position); window.removeEventListener('scroll', position, true); };
-  }, [open, value, items]);
-  function choose(item: Item) { onChange(item.name); setOpen(false); setActive(-1); }
+  }, [open, query, items]);
+  function openChoices() { setQuery(''); setActive(-1); setOpen(true); input.current?.select(); }
+  function choose(item: Item) { onChange(item.name); setQuery(''); setOpen(false); setActive(-1); }
   return <div className="item-picker" onBlur={event => {
     if (!event.currentTarget.contains(event.relatedTarget as Node | null) && !list.current?.contains(event.relatedTarget as Node | null)) { setOpen(false); setActive(-1); }
   }}>
@@ -49,11 +51,12 @@ export function ItemPicker({ items, value, onChange, label, placeholder = 'Searc
       <input ref={input} role="combobox" aria-label={label} aria-autocomplete="list" aria-expanded={open}
         aria-controls={listId} aria-activedescendant={open && active >= 0 && matches[active] ? `${listId}-${matches[active].id}` : undefined}
         autoComplete="off" data-tooltip={value || placeholder} value={value} placeholder={placeholder}
-        onFocus={() => setOpen(true)} onClick={() => setOpen(true)}
-        onChange={event => { onChange(event.target.value); setActive(-1); setOpen(true); }}
+        onFocus={openChoices} onClick={() => { if (!open) openChoices(); }}
+        onChange={event => { setQuery(event.target.value); onChange(event.target.value); setActive(-1); setOpen(true); }}
         onKeyDown={event => {
           if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-            event.preventDefault(); setOpen(true);
+            event.preventDefault();
+            if (!open) { openChoices(); setActive(event.key === 'ArrowDown' ? 0 : items.length - 1); return; }
             setActive(index => matches.length ? event.key === 'ArrowDown' ? Math.min(index + 1, matches.length - 1) : index < 0 ? matches.length - 1 : Math.max(0, index - 1) : -1);
           } else if (event.key === 'Enter' && open) {
             event.preventDefault();
@@ -63,7 +66,7 @@ export function ItemPicker({ items, value, onChange, label, placeholder = 'Searc
         }}/>
       {selected?.icon && <img src={`${import.meta.env.BASE_URL}${selected.icon}`} alt=""/>}
       <button type="button" tabIndex={-1} aria-label={`Show ${label.toLowerCase()} choices`}
-        onMouseDown={event => event.preventDefault()} onClick={() => { if (open) setOpen(false); else { input.current?.focus(); setOpen(true); } }}><span aria-hidden="true">▾</span></button>
+        onMouseDown={event => event.preventDefault()} onClick={() => { if (open) setOpen(false); else { input.current?.focus(); openChoices(); } }}><span aria-hidden="true">▾</span></button>
     </div>
     {open && createPortal(<div className="item-picker-menu item-picker-floating" style={menuStyle} ref={list} id={listId} role="listbox" aria-label={`${label} choices`}>
       {matches.map((item, index) => <div key={item.id} id={`${listId}-${item.id}`} role="option" tabIndex={-1}

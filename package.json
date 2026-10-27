@@ -1,6 +1,6 @@
 {
   "name": "dsp-wiki-desktop",
-  "version": "1.2.16",
+  "version": "1.2.17",
   "description": "Desktop client for the Dyson Sphere Program Fandom wiki",
   "main": "dist-electron/main.js",
   "author": "",
@@ -11,7 +11,7 @@
     "build:dir": "npm run typecheck && npm test && vite build && electron-builder --dir",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit",
-    "test": "node --test scripts/catalog.test.mjs scripts/design.test.mjs && tsx --test scripts/persistence.test.ts scripts/updates.test.ts",
+    "test": "node --test scripts/catalog.test.mjs scripts/design.test.mjs && tsx --test scripts/persistence.test.ts scripts/updates.test.ts scripts/factoryPlanner.test.ts",
     "data:refresh": "python3 scripts/import-wiki.py",
     "db:seed": "tsx scripts/seed-database.ts"
   },
