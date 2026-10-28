@@ -21,3 +21,5 @@
 .factory-totals{padding-top:16px}.factory-totals>.themed-select{max-width:360px;margin-bottom:10px}.factory-totals>small{display:block;margin-top:8px}
 
 .factory-total>span{margin-left:auto}.factory-trade-slot{width:34px;flex-shrink:0}.factory-total .factory-add-trade{position:relative;display:flex;align-items:center;justify-content:center;width:32px;height:30px;padding:3px;border:1px solid #36565b;border-radius:6px;background:#101c20}.factory-add-trade.imports{color:#72cafa}.factory-add-trade.exports{color:#79dfb0}.factory-add-trade .logistics-arrow{width:22px;height:22px}.factory-total .factory-trade-plus{position:absolute;right:-3px;bottom:-3px;display:grid;place-items:center;width:13px;height:13px;border-radius:50%;background:#142225;font-size:13px;line-height:1;color:inherit}.factory-add-trade:hover{background:#234037}
+
+.sorter-reach-icon{flex-shrink:0;color:#a3d8c8}
