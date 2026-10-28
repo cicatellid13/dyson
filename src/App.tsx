@@ -1,3 +1,4 @@
+import type { SavedFactory } from './lib/savedFactories';
 import { ItemPicker } from './components/ItemPicker';
 import { FactoryPlanner, EmbeddedFactoryPlanner } from './components/FactoryPlanner';
 import { themeDrag, useDelayedDragCursor } from './lib/dragAppearance';
@@ -64,8 +65,8 @@ export function App(){
 
  const [query,setQuery]=useState('');
  const [favoriteSearch,setFavoriteSearch]=useState('');
- const [plannerRequest,setPlannerRequest]=useState<{id:number;sequence:number}>();
- function planItem(id:number){setPlannerRequest(previous=>({id,sequence:(previous?.sequence??0)+1}));setCategory('Factory Planner');}
+ const [plannerRequest,setPlannerRequest]=useState<{id:number;sequence:number;saved?:SavedFactory;planetId?:string}>();
+ function planItem(id:number,saved?:SavedFactory,planetId?:string){setPlannerRequest(previous=>({id,saved,planetId,sequence:(previous?.sequence??0)+1}));setCategory('Factory Planner');}
  const [draggedItem,setDraggedItem]=useState<number|null>(null);
  const [favoriteDropTarget,setFavoriteDropTarget]=useState<string|null>(null);
  const [favoriteNotice,setFavoriteNotice]=useState('');

@@ -33,3 +33,8 @@ Unsupported: proliferation, cargo stacking, pile sorters, fractionation/probabil
 - Tests cover rates, all facility families, rounding, fractions, multi-output, input belts, multiple output belts, sorter/reach limits, alternates, invalid/unsupported and impossible configurations, determinism.
 
 Item pickers reopen with their full allowed item list while retaining the selected value. Typing starts a fresh filter; closing the menu does not clear the selection.
+
+### Output planning mode
+Target output retains the editable rate and Fill one belt action. Maximize capacity accepts a whole facility count and derives a read-only achievable output using the selected facility speed, sorter and reach, with supporting belts sized to the selected tier. The existing four-side/eight-sorter budget applies; the specified machine count is never increased. Mode and count remain session-only.
+
+Maximize capacity defaults to One belt per item, matching a single unstacked belt for each input and each output/byproduct. The target is capped by the tightest recipe-adjusted belt rate and retains the selected machine count. Unchecking restores multi-belt sizing. The setting remains session-only.

@@ -1,3 +1,4 @@
+import { validateFactories, type SavedFactory } from './savedFactories';
 export const DESIGN_KEY = 'dsp-design-v1';
 export type TradeEntry = {
   id: string;
@@ -14,6 +15,7 @@ export type DesignSection = {
   parentId: string | null;
   name: string;
   notes: string;
+  factories?: Record<string,SavedFactory>;
   planetType?: string;
   specializations?: string[];
   order?: number;
@@ -45,6 +47,8 @@ export function parseDesign(raw: string | null): DesignData {
     if (s.planetType !== undefined && (typeof s.planetType !== 'string' || s.planetType.length > 120)) throw Error('Invalid planet type.');
     if (s.specializations !== undefined && (!Array.isArray(s.specializations) || s.specializations.length>12 || s.specializations.some(t=>typeof t!=='string'||!t.trim()||t.length>40))) throw Error('Invalid specializations.');
     if (s.order !== undefined && !Number.isFinite(s.order)) throw Error('Invalid section order.');
+    validateFactories(s.factories);
+    if(s.kind!=='planet'&&s.factories&&Object.keys(s.factories).length)throw Error('Factory plans belong to planets.');
     ids.add(s.id);
     for (const list of [s.imports, s.exports]) {
       if (!Array.isArray(list) || list.some(e => !e || typeof e.id !== 'string' || (e.linkId !== undefined && typeof e.linkId !== 'string') || !Number.isInteger(e.itemId) || typeof e.amount !== 'string' ||
@@ -117,4 +121,11 @@ export function removeRouteSide(data:DesignData,ownerId:string,direction:'import
  if(!entry)return data;
  const opposite=direction==='imports'?'exports':'imports';
  return {...data,sections:data.sections.map(s=>({...s,[direction]:s.id===ownerId?s[direction].filter(e=>e.id!==entryId):s[direction],[opposite]:entry.linkId?s[opposite].map(e=>{if(e.linkId!==entry.linkId)return e;const {linkId,...unlinked}=e;return unlinked;}):s[opposite]}))};
+}
+
+/** Copy a factory requirement into logistics without replacing an existing route. */
+export function addFactoryTrade(data:DesignData,planetId:string,direction:'imports'|'exports',itemId:number,perSecond:number):DesignData {
+ const planet=data.sections.find(s=>s.id===planetId&&s.kind==='planet');
+ if(!planet||planet[direction].some(e=>e.itemId===itemId)||!Number.isInteger(itemId)||!Number.isFinite(perSecond)||perSecond<=0)return data;
+ return {...data,sections:data.sections.map(s=>s.id===planetId?{...s,[direction]:[...s[direction],{id:crypto.randomUUID(),itemId,amount:String(Number((perSecond*60).toPrecision(12))),unit:'items/min' as const,destination:'',planetId:null}]}:s)};
 }

@@ -3,8 +3,8 @@ import { useState } from 'react';
 import type { DesignSection } from '../lib/design';
 
 const STANDALONE = '__standalone__';
-export function PlanetPicker({ sections, planetId, legacyName, label, direction, onChange, excludedPlanetId }: {
-  excludedPlanetId?: string; sections: DesignSection[]; planetId?: string | null; legacyName: string;
+export function PlanetPicker({ sections, planetId, legacyName, label, direction, onChange, excludedPlanetId, hideLegend=false }: {
+  hideLegend?: boolean; excludedPlanetId?: string; sections: DesignSection[]; planetId?: string | null; legacyName: string;
   label: string; direction: 'From' | 'To'; onChange: (id: string | null) => void;
 }) {
   const planets = sections.filter(section => section.kind === 'planet');
@@ -13,8 +13,8 @@ export function PlanetPicker({ sections, planetId, legacyName, label, direction,
   const selectedGroup = selected ? selected.parentId ?? STANDALONE : group;
   const systems = sections.filter(section => section.kind === 'system').sort((a,b) => a.name.localeCompare(b.name));
   const choices = planets.filter(planet => planet.id !== excludedPlanetId && (planet.parentId ?? STANDALONE) === selectedGroup).sort((a,b) => a.name.localeCompare(b.name));
-  return <fieldset className="planet-picker">
-    <legend>{direction}</legend>
+  return <fieldset className="planet-picker" aria-label={hideLegend?label:undefined}>
+    {!hideLegend&&<legend>{direction}</legend>}
     <label>System<ThemedSelect aria-label={`${label} ${direction.toLowerCase()} system`} value={selectedGroup} onChange={event => { setGroup(event.target.value); onChange(null); }}>
       <option value="">Select a system</option>
       {systems.map(system => <option key={system.id} value={system.id}>{system.name || 'Unnamed system'}</option>)}

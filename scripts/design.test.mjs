@@ -1,9 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import ts from 'typescript';
-const compiled = ts.transpileModule(readFileSync(new URL('../src/lib/design.ts', import.meta.url), 'utf8'), {compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;
-const { createSection, parseDesign, removeSection, linkExport, linkRoute, updateTrades, routeReadiness, removeRouteSide } = await import('data:text/javascript;base64,' + Buffer.from(compiled).toString('base64'));
+import { createSection, parseDesign, removeSection, linkExport, linkRoute, updateTrades, routeReadiness, removeRouteSide } from '../src/lib/design.ts';
 test('systems, planets, notes and independent trade lists survive persistence', () => {
  const system = createSection('  Home system  ', 'system');
  const planet = createSection('Forge', 'planet', system.id);
