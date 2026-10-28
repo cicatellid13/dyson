@@ -253,3 +253,6 @@ Factory Planner has a single editable output target, initially one belt. Last-us
 
 ### Saved planet factories
 Factory Planner can save named plans to an existing system/planet. Plans retain item, recipe, equipment, reach, planning mode, rate/unit, machine count and single-belt setting. Planet Factories are collapsible, support reopening, renaming and confirmed deletion, and show combined gross input/output rates without creating logistics routes. Plans sync with the planet through backend-only Mongo persistence and recovery; independent plan IDs merge across machines. Equipment in a reopened plan is isolated from last-used defaults. Invalid stored plans are rejected. Totals omit unavailable recipes with a notice.
+
+### Multiple logistics peers
+Import/export rows select systems and planets with dark checkbox dropdowns. Checked systems determine available planets; the current planet is excluded. Linking creates a reciprocal row for every selected planet, with independent edge IDs and legacy singular-route compatibility. Removing a destination removes only that linked mirror. Remove-only-this-side preserves peer rows; remove-linked removes corresponding connections. An entered amount applies per selected peer and edits synchronize through explicit links. Graph and readiness include all selected peers.

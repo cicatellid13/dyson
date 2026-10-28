@@ -1,3 +1,4 @@
+import { ItemLink } from './ItemAccess';
 import { SaveFactory } from './SavedFactories';
 import type { SavedFactory } from '../lib/savedFactories';
 import { useEffect, useState } from 'react';
@@ -16,7 +17,7 @@ function Gauge({label,value}:{label:string;value:number}) {
   return <div className="planner-gauge"><span>{label}<b>{number(value*100)}%</b></span><meter min={0} max={1} value={value} aria-label={label}/></div>;
 }
 function ResourceRows({title,streams,items}:{title:string;streams:Stream[];items:Map<number,Item>}) {
-  return <section className="planner-resources"><h4>{title}</h4>{streams.map(s=><div className="planner-resource" key={s.id}><div>{items.get(s.id)?.icon&&<img src={`${import.meta.env.BASE_URL}${items.get(s.id)!.icon}`} alt=""/>}<strong>{items.get(s.id)?.name??`Item ${s.id}`}</strong></div><span>{rate(s.rate)}<small>{s.belts} belt{s.belts===1?'':'s'} · {number(s.beltUtilization*100)}% used</small></span><span>{s.sorters} sorters<small>{s.sortersPerMachine} per machine</small></span></div>)}</section>;
+  return <section className="planner-resources"><h4>{title}</h4>{streams.map(s=><div className="planner-resource" key={s.id}><ItemLink id={s.id} name={items.get(s.id)?.name}>{items.get(s.id)?.icon&&<img src={`${import.meta.env.BASE_URL}${items.get(s.id)!.icon}`} alt=""/>}<strong>{items.get(s.id)?.name??`Item ${s.id}`}</strong></ItemLink><span>{rate(s.rate)}<small>{s.belts} belt{s.belts===1?'':'s'} · {number(s.beltUtilization*100)}% used</small></span><span>{s.sorters} sorters<small>{s.sortersPerMachine} per machine</small></span></div>)}</section>;
 }
 /** Both surfaces deliberately instantiate the same controls and calculator with independent state. */
 function Calculator({catalog,item,compact=false,saved,planetId}:{catalog:Catalog;item:Item;compact?:boolean;saved?:SavedFactory;planetId?:string}) {
