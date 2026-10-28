@@ -1,6 +1,6 @@
 {
   "name": "dsp-wiki-desktop",
-  "version": "1.2.21",
+  "version": "1.2.22",
   "description": "Desktop client for the Dyson Sphere Program Fandom wiki",
   "main": "dist-electron/main.js",
   "author": "",
