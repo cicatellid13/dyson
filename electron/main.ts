@@ -9,6 +9,8 @@ import { startUpdates, updateBeforeOpening } from './backend/updates';
 import bundled from '../public/data/catalog.json';
 import type { Catalog } from '../src/lib/catalog';
 
+// Preserve existing profiles across product-name changes.
+app.setPath('userData', path.join(app.getPath('appData'), 'dsp-wiki-desktop'));
 const hasInstanceLock = app.requestSingleInstanceLock();
 if (!hasInstanceLock) app.quit();
 app.on('second-instance', () => { const window = BrowserWindow.getAllWindows()[0]; if (window) { if (window.isMinimized()) window.restore(); window.show(); window.focus(); } });
@@ -46,7 +48,7 @@ app.on('before-quit', event => {
   void persistence.close().catch(() => {}).finally(() => app.quit());
 });
 function createWindow(){
-  const win=new BrowserWindow({width:1400,height:960,minWidth:900,minHeight:650,title:'DSP Fieldguide',backgroundColor:'#101719',webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,nodeIntegration:false,sandbox:true}});
+  const win=new BrowserWindow({width:1400,height:960,minWidth:900,minHeight:650,title:'DSP Toolkit',backgroundColor:'#101719',webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,nodeIntegration:false,sandbox:true}});
   win.on('focus', () => { void persistence?.sync(); });
   win.webContents.setWindowOpenHandler(({url})=>{void safeExternal(url);return {action:'deny'};});
   win.webContents.on('will-navigate',(event,url)=>{event.preventDefault();void safeExternal(url);});
@@ -56,7 +58,7 @@ function createWindow(){
 }
 let starting = true;
 function showUpdateNotice(version: string) {
-  const notice=new BrowserWindow({width:390,height:155,resizable:false,alwaysOnTop:true,autoHideMenuBar:true,title:'DSP Fieldguide',backgroundColor:'#101719',webPreferences:{nodeIntegration:false,contextIsolation:true,sandbox:true}});
+  const notice=new BrowserWindow({width:390,height:155,resizable:false,alwaysOnTop:true,autoHideMenuBar:true,title:'DSP Toolkit',backgroundColor:'#101719',webPreferences:{nodeIntegration:false,contextIsolation:true,sandbox:true}});
   const safeVersion=version.replace(/[^a-zA-Z0-9.+-]/g,'');
   void notice.loadURL('data:text/html;charset=utf-8,'+encodeURIComponent(`<html><body style="margin:0;padding:22px;background:#101719;color:#dfe7e9;font:14px system-ui;text-align:center"><p>Updating to version ${safeVersion}</p><button onclick="window.close()" style="background:#294238;border:1px solid #486353;border-radius:5px;color:#dfe7e9;padding:7px 30px;cursor:pointer">OK</button><script>setTimeout(()=>window.close(),5000)</script></body></html>`));
   setTimeout(()=>{if(!notice.isDestroyed())notice.close();},5500).unref();

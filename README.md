@@ -1,119 +1,100 @@
-# DSP Fieldguide
+# DSP Toolkit
 
-An offline desktop item and recipe reference for Dyson Sphere Program, for macOS and Windows.
+An unofficial desktop companion for **Dyson Sphere Program**, for macOS and Windows. Browse the offline item catalog, calculate factory requirements, plan planetary logistics, and keep notes and to-dos in one shared workspace.
 
-- 172 enabled items and buildings, 160 recipes, and 172 locally bundled icons in the current snapshot
-- Instant local search and category filters
-- Clickable ingredients, outputs, production facilities, and used-in recipes
-- Alternate recipes, unlock technology, crafting time, and quantity scaling
-- Expandable production chains with cycle protection
-- Persistent favorites
-- Logistics Network: systems with nested planets, notes, import/export routes, and per-planet filters. Data saves locally and syncs across machines through MongoDB.
-- Planning: folders and plain-text notes with automatic saving, offline recovery and cross-machine sync.
-- Planet types, compact expanding notes, and readable item filters for larger systems.
-- Dark Fog toggle hides combat content throughout the app or restores it in full color.
+## What is included
 
-## Run
+- **Item library:** searchable list and game-style grid, collapsible categories, Dark Fog filtering, local item icons, wiki overviews with clickable references, alternate recipes, quantity scaling, and expandable ingredient recipes.
+- **Favorites:** star items from the catalog, drag items into Favorites, reorder them, and filter your saved items.
+- **Factory Planner:** choose a recipe, production facility, belt, sorter and reach. Use **Target output** or **Maximize capacity**, optionally limiting each item to one belt. View machine counts, input/output rates and transport requirements. Equipment preferences survive restarts; unsaved planner state lasts for the session.
+- **Saved factories:** save named plans to planets, reopen or rename them, inspect equipment details, and view a single factory or combined requirements. Add required inputs and outputs directly to the planet’s imports and exports.
+- **Logistics Network:** organize planets under systems; record planet types, specializations and notes; select multiple destination/source planets grouped by system; create matching routes; inspect mismatches; and visualize planet-to-planet connections. Folders, selections and expansion state are remembered during the session.
+- **Planning:** folders, scratch notes, automatic saving, drag reordering, and typed to-dos (import, export, production, power, issue and other), with filters and removal of completed tasks.
+- **Shared storage:** local recovery plus MongoDB synchronization for your workspace and reference catalog. Database access stays in the Electron backend.
 
-Node.js 22 recommended. Copy `.env.example` to `.env` and supply your MongoDB URI before launching.
+The proposed recursive **full production-chain factory planner is not implemented**. The existing expandable recipe reference and single-stage Factory Planner are separate features.
+
+## Run from source
+
+Use Node.js 22. Copy `.env.example` to `.env` and supply your MongoDB connection configuration. Never commit credentials.
 
 ```sh
-npm install
+npm ci
 npm run dev
 ```
 
-Uses a dedicated development port, 5199. Electron opens the correct Vite server. First setup requires MongoDB access. After initialization, the catalog, images and workspace are cached for offline use.
+Development uses port **5199** and launches Electron. First initialization needs MongoDB access. After initialization, the catalog and workspace are cached locally; bundled images and browsing do not require wiki API requests.
 
-## Package
+## Build and verify
 
 ```sh
-npm run build:dir # unpacked native application in release/
-npm run build     # macOS DMG/ZIP or Windows NSIS installer
+npm run typecheck
+npm test
+npm run build:dir # unpacked native app in release/
+npm run build     # native installer/archive
 ```
 
-Build on the target operating system. macOS builds are unsigned for local use; public distribution requires signing/notarization. Windows installer packaging is checked by the repository’s Windows workflow.
+Build on the target operating system. The Mac app is `release/mac-arm64/DSP Toolkit.app` on Apple Silicon. Windows produces `release/DSP-Toolkit-Setup.exe`. Tests cover catalog integrity, recipe calculations, logistics linking, workspace merging, saved factories, and updater behavior. The build runs type checking and tests before packaging.
 
-## Data and updates
+The supplied app artwork is configured in `build/icons/`; the sidebar uses a transparent logo in `public/art/`. Product branding is **DSP Toolkit**. The internal package name, app ID, database name and storage locations remain stable to preserve existing installations’ data.
 
-The bundled data comes from [DSP Wiki Module:Recipe/Data](https://dyson-sphere-program.fandom.com/wiki/Module:Recipe/Data). The catalog records the original revision, source timestamp, and download timestamp. Browsing makes no runtime wiki API calls and loads no remote images.
+## Installation and configuration
 
-To deliberately refresh the snapshot (Python 3 and curl required):
+Download the Windows installer from [the latest release](https://github.com/cicatellid13/dyson/releases/latest). Install under the same Windows account as before; do not uninstall or delete application data to upgrade. Existing MongoDB configuration is retained.
+
+For a first installation, create a `.env` using the fields in `.env.example` at:
+
+- Windows: `%APPDATA%\dsp-wiki-desktop\.env`
+- macOS: `~/Library/Application Support/dsp-wiki-desktop/.env`
+
+Configure the same MongoDB database on each machine and allow each machine’s IP in your Atlas network settings. No local MongoDB server is needed. This is a trusted, single-workspace desktop app, with no user accounts or per-user isolation. Sharing a database means sharing its workspace.
+
+Alternatively, download the repository source and run:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$HOME\Downloads\dyson-main\scripts\install-windows.ps1"
+```
+
+The setup script obtains checksum-verified Node.js build tools, installs locked dependencies, builds and installs the app, and prompts for the MongoDB URI using hidden input. When run from the downloaded source it uses that copy; otherwise it can obtain the repository. Setup logs are stored under `%LOCALAPPDATA%\DSP-Toolkit-Setup`. The execution-policy override applies only to this PowerShell process.
+
+## Application updates
+
+### Windows
+
+- **At startup:** check for a stable release before opening the editing workspace. If an update is found, show “Updating to version …” with an OK button; the notice dismisses after five seconds. The app downloads, installs and relaunches automatically when this finishes within the startup window.
+- **Startup timeout:** after 30 seconds the workspace opens rather than blocking indefinitely. A late download does not restart an active session; installation is deferred until quit.
+- **While open:** check every four hours and download available updates in the background. Do not interrupt editing. A downloaded update installs when the app quits; the next launch uses the new version. The five-second notice is for the startup flow, not a background-release announcement.
+- Offline or failed checks are retried. Development builds do not run the updater.
+
+Pushing to `main` automatically runs the Windows build and publishes a release. CI uses the source version if it is newer than published releases; otherwise it increments the patch in the current release series. The installer, blockmap and `latest.yml` are uploaded to a draft before publication. Failed builds do not publish incomplete updates. The public repository allows credential-free update downloads. Installers are unsigned and may trigger Windows reputation warnings.
+
+### macOS
+
+The current Mac build is unsigned and **does not download or install app updates automatically**. Local updates are handled by rebuilding, reopening, and verifying the app. Quit it before replacing packaged files, preserve its data directory, and use the published Windows version for the corresponding Mac build. A signed distribution would require a separate signing and update setup.
+
+## Workspace storage and synchronization
+
+The backend creates `dsp_fieldguide.wiki_catalog` and `dsp_fieldguide.workspace` programmatically. `npm run db:seed` seeds the bundled catalog without overwriting an existing catalog or workspace. Initial migration imports the profile’s legacy data only if no shared workspace exists; later devices load the shared workspace. Local recovery and migration backups are retained.
+
+Changes save locally and synchronize after a 750 ms pause. Revision checks protect against overwrites: independent changes merge, while conflicting changes offer a resolution choice and retain recovery data. Other-device changes are checked every 30 seconds and on window focus. Offline changes retry when connectivity returns. Secrets are excluded from Git and installers.
+
+## Wiki data and calculation limits
+
+The bundled reference data comes from [DSP Wiki](https://dyson-sphere-program.fandom.com/wiki/Dyson_Sphere_Program_Wiki), including its recipe data and item overviews. Item links open their corresponding wiki page. To refresh local reference data deliberately:
 
 ```sh
 npm run data:refresh
 npm test
 ```
 
-The importer reads declarative Lua literals without executing Lua, downloads icons, and atomically replaces the catalog after success. Existing icon files are reused. Rebuild to include the refreshed snapshot. No automatic expiration or background update requests.
+The importer requires Python 3 and curl, parses declarative Lua without executing it, and caches images. Rebuild to distribute refreshed assets. Updating the bundled snapshot alone does not overwrite the shared MongoDB catalog; that requires an explicit backend catalog migration.
 
-Recipe quantities use whole batches. Fractionation shows expected statistical yields. Times are base recipe times, without machine speed or proliferator bonuses. Production chains use the first listed ingredient recipes, stop at cycles/eight levels, and do not reuse byproducts across branches. This is a recipe reference, not a factory optimizer or complete wiki mirror.
+Recipe-reference quantities use whole crafting batches; fractionation displays expected yields. Expandable reference chains use the first listed ingredient recipe, stop at cycles/depth limits, and do not reuse byproducts across branches.
 
-## Verification
+Factory Planner is a single-stage rate estimate, not a tile-verified blueprint. It accounts for supported facility speeds, belt/sorter rates and reach under its connection budget. It assumes full power and continuous inputs; proliferation, stacking, pile sorters, fractionation and recycling-loop optimization are not modeled. Combined saved-factory requirements are gross totals, not netted planet-wide balances.
 
-```sh
-npm run typecheck
-npm test
-```
-
-Tests verify every item image, recipe references and quantities, known Processor inputs, batch rounding, and fractionation/alternate recipes.
-
-Specification: [docs/SPEC.md](docs/SPEC.md).
+Specifications and implementation notes are in [docs/SPEC.md](docs/SPEC.md).
 
 ## Attribution
 
-Wiki text/data © DSP Wiki contributors, under the wiki's applicable [Fandom content license](https://www.fandom.com/licensing). Source revision and item-page links are displayed in the app. Game names and artwork belong to their respective rights holders (Youthcat Studio / Gamera Games); included as reference material. This is an unofficial companion app.
-
-## Windows setup script
-
-Download `scripts/install-windows.ps1` to a Windows 11 x64 or ARM64 PC and run it from PowerShell:
-
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$HOME\Downloads\install-windows.ps1"
-```
-
-The execution policy override applies only to that process. The script downloads checksum-verified Node.js 22 build tools, obtains the private repository via GitHub login when needed, installs locked dependencies, runs checks, builds an NSIS installer, and installs DSP Fieldguide for your Windows account. No system-wide Node.js or Git installation is required. Internet is required for setup and the first MongoDB connection; subsequent launches can use the offline cache. GitHub authentication may require your browser.
-
-Alternatively, download and extract the repository ZIP from GitHub while signed in, then run the script from its `scripts` folder. It uses the adjacent source and skips GitHub CLI setup/login.
-
-Setup logs and build tools are retained under `%LOCALAPPDATA%\DSP-Fieldguide-Setup` for troubleshooting. The Windows installer is unsigned; Windows may show an app reputation prompt. Windows installer packaging and tests are validated in GitHub Actions. Interactive installation on a separate Windows PC has not been tested here. Mac systems, planets, notes and favorites load automatically from the same MongoDB database.
-
-
-## MongoDB configuration and sync
-
-The Electron backend creates `dsp_fieldguide.wiki_catalog` and `dsp_fieldguide.workspace` automatically. `npm run db:seed` seeds the bundled catalog without replacing an existing snapshot or your workspace. The first connected desktop launch migrates that app profile’s existing planets, systems and favorites if no shared workspace exists; later devices use the shared workspace. A local legacy backup is retained.
-
-Development reads the project `.env`. Installed apps read:
-- macOS: `~/Library/Application Support/dsp-wiki-desktop/.env`
-- Windows: `%APPDATA%\dsp-wiki-desktop\.env`
-
-Use the fields from `.env.example`. The Windows setup script asks for the URI using hidden input and creates the file for you. Configure the same database on each computer; its IP must be permitted by your Atlas network settings. Real credentials are ignored by Git and excluded from installers. Database access stays inside the Electron backend; this is a trusted, single-user desktop deployment.
-
-Edits save locally immediately and sync after a 750 ms pause. A shared workspace document allows an atomic revision check; only changed sections, planning folders/notes, or settings are written. Independent changes merge, while conflicting edits show a choice and retain a backup. The app checks other devices every 30 seconds and when focused. Offline edits retry automatically. Initial connection requires network access; subsequent launches use the cache. Local recovery files live beside the installed app’s `.env`.
-
-Catalog seeding is intentionally idempotent. A new wiki snapshot requires an explicit backend catalog migration; `data:refresh` alone does not overwrite the shared catalog. Images remain bundled with the app.
-
-
-### Windows installation from the repository ZIP
-
-1. Sign into GitHub with the account that can access this private repository, then download the `main` branch ZIP to Downloads as `dyson-main.zip`.
-2. Open Windows PowerShell and run:
-
-```powershell
-$sourceFolder = Join-Path $HOME 'Downloads\DSP-Fieldguide-Source'
-Expand-Archive -LiteralPath "$HOME\Downloads\dyson-main.zip" -DestinationPath $sourceFolder -Force
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$sourceFolder\dyson-main\scripts\install-windows.ps1"
-```
-
-3. When prompted, paste the same MongoDB connection string used on your Mac and press Enter. Input is hidden. The script creates the private `.env` for your Windows account.
-4. Open DSP Fieldguide from Start. Wait for **Cloud synced**, then open **Logistics Network**; your existing Sadira system and planets should appear. No local MongoDB server, Node.js or Git installation is required beforehand.
-5. If cloud access fails, ensure Atlas Network Access allows this Windows machine's public IP, then reopen the app. If installation fails, use the setup log path printed by the script. Keep the window open until setup completes.
-
-## Automatic Windows updates
-
-Install the latest **DSP-Fieldguide-Setup.exe** from [Releases](https://github.com/cicatellid13/dyson/releases/latest) once to upgrade older installations that do not include an updater. Close the existing app first, then run the installer using the same Windows account. Your existing workspace and `%APPDATA%\dsp-wiki-desktop\.env` are preserved; do not uninstall or delete application data.
-
-After this upgrade, the app checks for new stable releases at startup and every four hours, downloads them in the background, and installs them when you normally close the app. Open it again to use the new version. Offline checks retry automatically. The small version label below Dark Fog identifies the running release.
-
-Pushing to `main` runs the Windows build/tests and publishes an update automatically. CI uses the version in `package.json` for a new release series (currently `1.2.0`), then increments the patch above the highest published release in that series. The installer and visible version always match. Installer, blockmap and `latest.yml` are uploaded to a draft before publishing; failed builds do not publish an update. The repository must be **public** for credential-free downloads. No GitHub token is stored on users' machines. These automatic updates currently target Windows x64 (including supported Windows ARM x64 emulation); Mac builds remain manually updated.
-
-Installers are currently unsigned; Windows may show its usual unknown-publisher notice during initial setup. Update downloads use HTTPS and the release manifest's SHA-512 integrity check. Keep GitHub publishing access restricted to trusted maintainers.
+Wiki text and data © DSP Wiki contributors under the applicable [Fandom content license](https://www.fandom.com/licensing). Game names and artwork belong to their rights holders, Youthcat Studio / Gamera Games. DSP Toolkit is an unofficial companion app.

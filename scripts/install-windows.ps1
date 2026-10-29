@@ -6,7 +6,7 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $repo = 'cicatellid13/dyson'
-$workRoot = Join-Path $env:LOCALAPPDATA ('DSP-Fieldguide-Setup\' + [Guid]::NewGuid().ToString('N'))
+$workRoot = Join-Path $env:LOCALAPPDATA ('DSP-Toolkit-Setup\' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $workRoot -Force | Out-Null
 $logPath = Join-Path $workRoot 'setup.log'
 Start-Transcript -Path $logPath | Out-Null
@@ -96,10 +96,10 @@ try {
     Set-Location $source
     Write-Host 'Installing dependencies...'
     Run-Checked $npm @('ci', '--no-audit', '--no-fund')
-    Write-Host 'Checking and building DSP Fieldguide. This may take several minutes...'
+    Write-Host 'Checking and building DSP Toolkit. This may take several minutes...'
     $env:CSC_IDENTITY_AUTO_DISCOVERY = 'false'
     Run-Checked $npm @('run', 'build', '--', '--win', "--$nodeArch", '--publish', 'never')
-    $installer = Join-Path $source 'release\DSP-Fieldguide-Setup.exe'
+    $installer = Join-Path $source 'release\DSP-Toolkit-Setup.exe'
     if (-not (Test-Path $installer)) { throw 'The build completed but the installer was not found.' }
     $configDir = Join-Path $env:APPDATA 'dsp-wiki-desktop'
     New-Item -ItemType Directory -Path $configDir -Force | Out-Null
@@ -122,10 +122,10 @@ try {
             $mongoUri = $null; $secureUri = $null
         }
     }
-    Write-Host 'Installing DSP Fieldguide for your Windows account...'
+    Write-Host 'Installing DSP Toolkit for your Windows account...'
     $installProcess = Start-Process -FilePath $installer -ArgumentList '/S' -Wait -PassThru
     if ($installProcess.ExitCode -ne 0) { throw "Installer failed (exit $($installProcess.ExitCode))." }
-    Write-Host 'Installed! Open DSP Fieldguide from the Start menu.'
+    Write-Host 'Installed! Open DSP Toolkit from the Start menu.'
     Write-Host "Installer: $installer"
     Write-Host 'Planets, systems and favorites sync through MongoDB. Offline changes are cached on this device.'
 } catch {

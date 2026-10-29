@@ -1,4 +1,4 @@
-# DSP Fieldguide — Offline recipe reference
+# DSP Toolkit — Offline recipe reference
 
 ## User outcome
 Find an item, see exactly what builds it, and follow ingredients through their production chain without an internet connection.
@@ -256,3 +256,12 @@ Factory Planner can save named plans to an existing system/planet. Plans retain 
 
 ### Multiple logistics peers
 Import/export rows select systems and planets with dark checkbox dropdowns. Checked systems determine available planets; the current planet is excluded. Linking creates a reciprocal row for every selected planet, with independent edge IDs and legacy singular-route compatibility. Removing a destination removes only that linked mirror. Remove-only-this-side preserves peer rows; remove-linked removes corresponding connections. An entered amount applies per selected peer and edits synchronize through explicit links. Graph and readiness include all selected peers.
+
+## Toolkit branding and saved-factory refinements
+
+- Display DSP Toolkit in window titles, startup UI, installers and release names; show TOOLKIT beside a transparent orbital logo in the sidebar. Keep the existing package/app/database identity and profile path to preserve upgrades and data.
+- Use the supplied orbital artwork for Mac and Windows application icons.
+- A saved-plan confirmation links to its destination planet in Logistics Network, expands the parent system and opens details rather than the graph.
+- With one saved factory, requirements select that factory and the selector is disabled. With multiple factories, retain combined and per-factory options.
+- Show a compact document/info control beside the saved factory's item label. Its themed tooltip lists facilities, output rate, facility, belt, sorter and reach on separate lines.
+- Remove the general batch-rounding explanatory paragraph from recipe details; retain fractionation-specific explanation.

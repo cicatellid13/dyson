@@ -1,6 +1,6 @@
 # Keep the local Mac app current
 
-- After every future app update, rebuild the user's local Mac app at `release/mac-arm64/DSP Fieldguide.app`, reopen it, and verify the displayed version before declaring completion.
+- After every future app update, rebuild the user's local Mac app at `release/mac-arm64/DSP Toolkit.app`, reopen it, and verify the displayed version before declaring completion.
 - Quit the running app before replacing its packaged files. Preserve userData, .env, local recovery and MongoDB data.
 - Use an explicitly requested version when given. Otherwise, after publishing a release, use that release version for the local Mac build so it matches Windows. Set the version before both Vite and Electron packaging; never change only the label.
 - Keep the source package.json and package-lock.json versions consistent with the intended local build. Avoid pushing a version-only synchronization change that unnecessarily triggers another automatic release.

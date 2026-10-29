@@ -5,7 +5,7 @@ API='https://dyson-sphere-program.fandom.com/api.php'
 SOURCE='https://dyson-sphere-program.fandom.com/wiki/Module:Recipe/Data'
 def get(url):
     return subprocess.check_output(['curl', '--fail', '--location', '--silent', '--show-error',
-        '--retry', '3', '--max-time', '40', '-H', 'User-Agent: DSP-Fieldguide/2.0',
+        '--retry', '3', '--max-time', '40', '-H', 'User-Agent: DSP-Toolkit/2.0',
         '-H', 'Referer: https://dyson-sphere-program.fandom.com/', url])
 def api(**params):
     return json.loads(get(API+'?'+urllib.parse.urlencode(dict(format='json',**params))))

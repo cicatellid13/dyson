@@ -46,10 +46,10 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       - uses: actions/upload-artifact@v7.0.2
         with:
-          name: DSP-Fieldguide-Windows-x64
+          name: DSP-Toolkit-Windows-x64
           path: |
-            release/DSP-Fieldguide-Setup.exe
-            release/DSP-Fieldguide-Setup.exe.blockmap
+            release/DSP-Toolkit-Setup.exe
+            release/DSP-Toolkit-Setup.exe.blockmap
             release/latest.yml
           if-no-files-found: error
       - name: Publish complete update
@@ -63,10 +63,10 @@ jobs:
             $draft = gh release view $tag --json isDraft --jq .isDraft
             if ($draft -ne 'true') { throw 'This version is already published; start a new workflow run.' }
           } else {
-            gh release create $tag --draft --target $env:GITHUB_SHA --title "DSP Fieldguide $env:RELEASE_VERSION" --notes "Windows update. Install once to enable future automatic updates. Your workspace and configuration are preserved."
+            gh release create $tag --draft --target $env:GITHUB_SHA --title "DSP Toolkit $env:RELEASE_VERSION" --notes "Windows update. Install once to enable future automatic updates. Your workspace and configuration are preserved."
             if ($LASTEXITCODE) { throw 'Could not create draft release.' }
           }
-          gh release upload $tag release/DSP-Fieldguide-Setup.exe release/DSP-Fieldguide-Setup.exe.blockmap release/latest.yml --clobber
+          gh release upload $tag release/DSP-Toolkit-Setup.exe release/DSP-Toolkit-Setup.exe.blockmap release/latest.yml --clobber
           if ($LASTEXITCODE) { throw 'Could not upload update assets.' }
           gh release edit $tag --draft=false --latest
           if ($LASTEXITCODE) { throw 'Could not publish update.' }

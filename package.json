@@ -1,6 +1,6 @@
 {
   "name": "dsp-wiki-desktop",
-  "version": "1.2.23",
+  "version": "1.2.24",
   "description": "Desktop client for the Dyson Sphere Program Fandom wiki",
   "main": "dist-electron/main.js",
   "author": "",
@@ -37,7 +37,7 @@
   },
   "build": {
     "appId": "com.dsp.wiki.desktop",
-    "productName": "DSP Fieldguide",
+    "productName": "DSP Toolkit",
     "directories": {
       "output": "release"
     },
@@ -46,13 +46,15 @@
       "target": [
         "dmg",
         "zip"
-      ]
+      ],
+      "icon": "build/icons/app.png"
     },
     "win": {
       "target": [
         "nsis"
       ],
-      "artifactName": "DSP-Fieldguide-Setup.exe"
+      "artifactName": "DSP-Toolkit-Setup.exe",
+      "icon": "build/icons/app.png"
     },
     "files": [
       "dist/**/*",
