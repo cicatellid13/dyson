@@ -6,7 +6,7 @@ export function findInNetwork(data:DesignData,catalog:Catalog,itemId:number):Net
  const results:NetworkMatch[]=[];
  for(const p of data.sections.filter(s=>s.kind==='planet')){
   const base={planetId:p.id,planetName:p.name,systemName:data.sections.find(s=>s.id===p.parentId)?.name??'Unassigned'};
-  for(const direction of ['imports','exports'] as const)for(const e of p[direction])if(e.itemId===itemId)results.push({...base,kind:direction==='imports'?'Imports':'Exports',entryId:e.id,metric:e.amount.trim()&&Number.isFinite(Number(e.amount))?`${e.amount} ${e.unit} configured`:undefined,detail:e.amount?`${e.amount} ${e.unit} configured`:'Rate not specified'});
+  for(const direction of ['imports','exports'] as const)for(const e of p[direction])if(e.itemId===itemId)results.push({...base,kind:direction==='imports'?'Imports':'Exports',entryId:e.id,metric:e.amount.trim()&&Number.isFinite(Number(e.amount))?`${e.amount} ${e.unit}`:undefined,detail:e.amount?`${e.amount} ${e.unit}`:'Rate not specified'});
   for(const f of Object.values(p.factories??{})){
    const result=calculateSavedFactory(catalog,f);
    if(result.ok){for(const [rows,kind] of [[result.outputs,'Produces'],[result.inputs,'Uses']] as const){const row=rows.find(r=>r.id===itemId);if(row)results.push({...base,kind,factoryId:f.id,rate:row.rate*60,metric:`${f.name} · ${(row.rate*60).toLocaleString(undefined,{maximumFractionDigits:2})}/min planned`,detail:`${f.name} · ${(row.rate*60).toLocaleString(undefined,{maximumFractionDigits:2})}/min planned`});}}
