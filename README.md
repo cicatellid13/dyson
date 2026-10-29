@@ -10,6 +10,8 @@ An unofficial desktop companion for **Dyson Sphere Program**, for macOS and Wind
 - **Saved factories:** save named plans to planets, reopen or rename them, inspect equipment details, and view a single factory or combined requirements. Add required inputs and outputs directly to the planet’s imports and exports.
 - **Logistics Network:** organize planets under systems; record planet types, specializations and notes; select multiple destination/source planets grouped by system; create matching routes; inspect mismatches; and visualize planet-to-planet connections. Folders, selections and expansion state are remembered during the session.
 - **Planning:** folders, scratch notes, automatic saving, drag reordering, and typed to-dos (import, export, production, power, issue and other), with filters and removal of completed tasks.
+- **Find in network:** locate an item in planetary imports, exports and saved-factory inputs/outputs, with grouped results and direct navigation. Select suppliers from an import entry using the existing matching-route flow.
+- **Undo removal:** restore the most recent planet, note, factory, route or favorite removal during the session, without rolling back unrelated edits. No history log is retained.
 - **Shared storage:** local recovery plus MongoDB synchronization for your workspace and reference catalog. Database access stays in the Electron backend.
 
 The proposed recursive **full production-chain factory planner is not implemented**. The existing expandable recipe reference and single-stage Factory Planner are separate features.

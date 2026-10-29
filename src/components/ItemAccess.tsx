@@ -2,7 +2,7 @@ import type { SavedFactory } from '../lib/savedFactories';
 import { FactoryPlannerIcon } from './FactoryPlannerIcon';
 import { themeDrag } from '../lib/dragAppearance';
 import { createContext, useContext, type DragEvent, type ReactNode } from 'react';
-export const ItemAccessContext = createContext<{navigate:(id:number)=>void;planet:(id:string)=>void;plan:(id:number,saved?:SavedFactory,planetId?:string)=>void;drag:(id:number|null)=>void}>({navigate:()=>{},planet:()=>{},plan:()=>{},drag:()=>{}});
+export const ItemAccessContext = createContext<{navigate:(id:number)=>void;planet:(id:string,entryId?:string,factoryId?:string)=>void;network:(id:number,consumer?:{planetId:string;entryId:string})=>void;plan:(id:number,saved?:SavedFactory,planetId?:string)=>void;drag:(id:number|null)=>void}>({navigate:()=>{},planet:()=>{},network:()=>{},plan:()=>{},drag:()=>{}});
 export function useItemAccess(){
  const actions=useContext(ItemAccessContext);
  return {...actions, dragProps:(id:number)=>({draggable:true,onDragStart:(event:DragEvent)=>{event.stopPropagation();themeDrag(event);event.dataTransfer.effectAllowed='copyMove';event.dataTransfer.setData('application/x-dsp-item',String(id));actions.drag(id);},onDragEnd:()=>actions.drag(null)})};

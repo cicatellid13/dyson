@@ -265,3 +265,10 @@ Import/export rows select systems and planets with dark checkbox dropdowns. Chec
 - With one saved factory, requirements select that factory and the selector is disabled. With multiple factories, retain combined and per-factory options.
 - Show a compact document/info control beside the saved factory's item label. Its themed tooltip lists facilities, output rate, facility, belt, sorter and reach on separate lines.
 - Remove the general batch-rounding explanatory paragraph from recipe details; retain fractionation-specific explanation.
+
+## Network lookup and single-action removal undo
+
+- Find in network on item details is enabled only for items present in planet routes or saved-factory inputs/outputs. Otherwise it is muted with an explanatory tooltip.
+- Results group by system and planet, filter Produces/Exports/Imports/Uses, distinguish planned rates from configured route rates, and open the relevant planet/entry/factory. Import rows can search suppliers and create matching routes using existing linking rules.
+- Keep one session-only removal action globally for planets/systems, notes/folders, factories, imports/exports and favorites. New removals replace the previous action. Ordinary typing is not undoable. Undo restores only that action's delta, including linked-route changes; unrelated later edits are preserved. Conflicting changes block undo rather than overwrite current data. No history screen or persistent undo log.
+- Network lookup uses a header icon alongside Factory Planner and one row of saved-factory/import/export icons per planet. Icons open and scroll to the expanded matching entry. Metric tooltips show available planned factory rates or configured route amounts; entries with no specified metrics have no tooltip.

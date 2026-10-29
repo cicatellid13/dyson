@@ -1,3 +1,4 @@
+import {NetworkButton} from './NetworkSearch';
 import { MultiPlanetPicker } from './MultiPlanetPicker';
 import { routePlanets, routeLinks } from '../lib/design';
 import { PlanetFactories } from './SavedFactories';
@@ -14,7 +15,7 @@ import { SystemGraph, VisualizeIcon } from './SystemGraph';
 import { AutoTextarea } from './AutoTextarea';
 import { LogisticsArrow } from './LogisticsArrow';
 import { useWorkspace, updateWorkspace } from '../lib/persistence';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { isDefenseItem, type Catalog, type Item } from '../lib/catalog';
 import { createSection, removeSection, orderedSections, reorderSections, type DesignData, type DesignSection, type TradeEntry } from '../lib/design';
 import '../styles/design.css';
@@ -23,7 +24,7 @@ import { ItemPicker } from './ItemPicker';
 function TradeList({ direction, entries, items, sections, onChange, collapsible = false, currentPlanetId }: {
   currentPlanetId?: string; collapsible?: boolean; direction: 'imports' | 'exports'; entries: TradeEntry[]; items: Item[]; sections: DesignSection[]; onChange: (entries: TradeEntry[]) => void;
 }) {
-  const itemActions = useItemAccess();
+  const itemActions = useItemAccess();const sourceCatalog=useWorkspace().catalog!;
   const [expandedEntries, setExpandedEntries] = useSessionExpansion('logistics-entries');
   const [advanced,setAdvanced]=useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
@@ -53,7 +54,7 @@ function TradeList({ direction, entries, items, sections, onChange, collapsible 
     <div className="trade-entries">{orderedEntries.map(entry => {
       const item = lookup.get(entry.itemId);
       const toggle=()=>setExpandedEntries(current=>{const next=new Set(current);if(next.has(entry.id))next.delete(entry.id);else next.add(entry.id);return next;});
-      return <div className="trade-entry" key={entry.id}>
+      return <div className="trade-entry" data-network-entry={entry.id} key={entry.id}>
         <div className="input-access-row planet-route-heading" {...itemActions.dragProps(entry.itemId)}>
         <ItemLink id={entry.itemId} name={item?.name}>{item?.icon&&<img className="item-icon" src={`${import.meta.env.BASE_URL}${item.icon}`} alt=""/>}<strong>{item?.name??`Item ${entry.itemId}`}</strong></ItemLink>
         <button className="route-expand-space" type="button" aria-label={`Expand ${item?.name} ${direction}`} aria-expanded={expandedEntries.has(entry.id)} onClick={toggle}/>
@@ -65,7 +66,7 @@ function TradeList({ direction, entries, items, sections, onChange, collapsible 
           <label>Amount<input aria-label={`${item?.name} ${direction} amount`} type="number" min="0" step="any" placeholder="Optional" value={entry.amount} onChange={e => { if (e.target.value === '' || Number(e.target.value) >= 0) patch(entry.id, { amount: e.target.value }); }}/></label>
           <label>Unit<ThemedSelect aria-label={`${item?.name} ${direction} unit`} value={entry.unit} onChange={e => patch(entry.id, { unit: e.target.value as TradeEntry['unit'] })}><option>items/min</option><option>items/s</option><option>items</option></ThemedSelect></label>
         </div>}
-        {(!collapsible || expandedEntries.has(entry.id)) && <div className="trade-entry-options"><MultiPlanetPicker sections={sections} entry={entry} ownerId={currentPlanetId} onChange={changes=>patch(entry.id,changes)}/>
+        {(!collapsible || expandedEntries.has(entry.id)) && <div className="trade-entry-options">{direction==='imports'&&currentPlanetId&&<NetworkButton id={entry.itemId} catalog={sourceCatalog} consumer={{planetId:currentPlanetId,entryId:entry.id}}/>}<MultiPlanetPicker sections={sections} entry={entry} ownerId={currentPlanetId} onChange={changes=>patch(entry.id,changes)}/>
         {currentPlanetId && routePlanets(entry).some(id=>!routeLinks(entry)[id]&&sections.some(s=>s.kind==='planet'&&s.id===id&&s.id!==currentPlanetId)) && <button type="button" className="create-matching-route" aria-label={`Create ${direction==='exports'?'import':'export'}`} data-tooltip={`Create or link the matching ${direction==='exports'?'import':'export'} on all selected planets`} onClick={()=>updateWorkspace(current=>({...current,design:linkRoute(current.design,currentPlanetId,direction,entry.id)}))}><svg className="matching-route-icon" width="120" height="48" viewBox="0 0 120 48" fill="none" aria-hidden="true"><g stroke="#78dfb8" strokeWidth="2.4"><circle cx="21" cy="24" r="14" fill="#65cba5" fillOpacity=".8"/><ellipse cx="21" cy="24" rx="21" ry="6" transform="rotate(-30 21 24)"/></g><path d="M48 24h19m-6-6 6 6-6 6" stroke="#78dfb8" strokeWidth="2.7" strokeLinecap="round" strokeLinejoin="round"/><g stroke="#54d7f1" strokeWidth="2.4"><circle cx="92" cy="21" r="17"/><ellipse cx="92" cy="21" rx="25" ry="7" transform="rotate(-30 92 21)"/></g><circle cx="106" cy="36" r="12" fill="#68ddb2" stroke="#173f34" strokeWidth="2"/><path d="M100 36h12m-6-6v12" stroke="#16483d" strokeWidth="2.5" strokeLinecap="round"/></svg></button>}
 
         {entry.linkId && currentPlanetId && <div className="linked-route-actions"><button type="button" className="route-action-button" data-tooltip="Remove this item from all linked planets" aria-label={`Remove ${item?.name} from all linked planets`} onClick={()=>onChange(entries.filter(e=>e.id!==entry.id))}><RemoveRouteIcon both/></button><button type="button" className="route-action-button" data-tooltip="Remove only this side; keep the other planets’ items" aria-label={`Remove ${item?.name} only from this planet`} onClick={()=>updateWorkspace(current=>({...current,design:removeRouteSide(current.design,currentPlanetId,direction,entry.id)}))}><RemoveRouteIcon both={false}/></button></div>}
@@ -140,11 +141,12 @@ export function Design({ catalog }: { catalog: Catalog }) {
   const [creation, setCreation] = useState<{kind: DesignSection['kind']; parentId: string | null; placement: 'sidebar' | 'inline'} | null>(null);
   const [name, setName] = useState('');
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [undo, setUndo] = useState<{data: DesignData; activeId: string | null; kind: 'planet' | 'system'} | null>(null);
   const [expandedSystems, setExpandedSystems] = useSessionExpansion('logistics-systems');
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   function expandSystem(id: string) { setExpandedSystems(current => new Set([...current,id])); }
+  const [networkFocus]=useSessionSelection('logistics-network-focus');
+  useEffect(()=>{if(!networkFocus)return;const target=JSON.parse(networkFocus) as {entryId?:string;factoryId?:string};const frame=requestAnimationFrame(()=>{const attr=target.entryId?'data-network-entry':'data-network-factory';const id=target.entryId??target.factoryId;if(!id)return;const element=Array.from(document.querySelectorAll<HTMLElement>(`[${attr}]`)).find(el=>el.getAttribute(attr)===id);element?.scrollIntoView({block:'center',behavior:'instant'});});return()=>cancelAnimationFrame(frame);},[networkFocus,activeId]);
   const active = data.sections.find(s => s.id === activeId);
   const parent = data.sections.find(s => s.id === active?.parentId);
   const currentSystem = active?.kind === 'system' ? active : parent;
@@ -154,7 +156,7 @@ export function Design({ catalog }: { catalog: Catalog }) {
   const unassigned = orderedSections(data.sections.filter(s => s.kind === 'planet' && s.parentId === null));
   function commit(next: DesignData) {
     updateWorkspace(current => ({...current, design: next}));
-    setUndo(null);
+
   }
   function patch(changes: Partial<DesignSection>) {
     commit({ ...data, sections: data.sections.map(s => s.id === activeId ? { ...s, ...changes } : s) });
@@ -184,8 +186,7 @@ export function Design({ catalog }: { catalog: Catalog }) {
     if (!deleteId) return;
     const removed = data.sections.find(s => s.id === deleteId);
     const next = removeSection(data, deleteId);
-    const previous = { data: { ...data, sections: data.sections.filter(s => !next.sections.some(kept => kept.id === s.id)) }, activeId, kind: removed?.kind ?? 'planet' };
-    commit(next); setUndo(previous); setActiveId(removed?.parentId ?? next.sections[0]?.id ?? null); setDeleteId(null);
+    commit(next); setActiveId(removed?.parentId ?? next.sections[0]?.id ?? null); setDeleteId(null);
   }
   function sectionButton(section: DesignSection, nested = false) {
     return <button key={section.id} className={`design-location ${nested ? 'nested' : ''} ${activeId === section.id ? 'active' : ''} ${dropTarget === section.id ? 'drop-target' : ''}`} draggable
@@ -211,7 +212,6 @@ export function Design({ catalog }: { catalog: Catalog }) {
     </aside>
     <section className="design-editor">
       {saveError && <div role="alert" className="design-error">{saveError}{!initial.error && <button className="design-button" onClick={() => commit(data)}>Retry saving</button>}</div>}
-      {undo && <div className="design-undo">{undo.kind === 'planet' ? 'Planet removed.' : 'System removed.'}<button onClick={() => { const restored = [...data.sections, ...undo.data.sections.filter(s => !data.sections.some(current => current.id === s.id))]; commit({ ...data, sections: restored.filter(s => !s.parentId || restored.some(parent => parent.id === s.parentId)) }); setActiveId(undo.activeId); setUndo(null); }}>Undo</button><button aria-label="Dismiss undo" onClick={() => setUndo(null)}>×</button></div>}
       {active ? <div key={active.id}>
         <div className="design-editor-top"><div className="eyebrow">{parent ? <><button onClick={() => navigate(parent.id)}>{parent.name || 'Unnamed system'}</button> / {active.name || 'Untitled planet'}</> : active.kind === 'system' ? 'STAR SYSTEM' : 'PLANET'}</div></div>
         <div className="system-name-row">{active.kind==='planet'?<EditablePlanetName key={active.id} name={active.name} onChange={name=>patch({name})}/>:<label className="design-name">Name<input aria-label="Section name" value={active.name} maxLength={120} onChange={e => patch({name: e.target.value})} onBlur={() => { if (!active.name.trim()) patch({name: active.kind === 'planet' ? 'Untitled planet' : 'Untitled system'}); }}/></label>}{active.kind === 'system' && <button className={`visualize-button ${graphSystem===active.id?'active':''}`} data-tooltip="visualize" aria-label={`Visualize ${active.name}`} aria-pressed={graphSystem===active.id} onClick={()=>setGraphSystem(graphSystem===active.id?null:active.id)}><VisualizeIcon/></button>}</div>

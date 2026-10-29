@@ -76,6 +76,6 @@ export function ItemPicker({ items, value, onChange, label, placeholder = 'Searc
         <span>{item.name}</span>{item.icon && <img src={`${import.meta.env.BASE_URL}${item.icon}`} alt=""/>}
       </div>)}
       {!matches.length && <p className="item-picker-empty" role="status">No matching items.</p>}
-    </div>, document.body)}
+    </div>, input.current?.closest('dialog') ?? document.body)}
   </div>;
 }

@@ -20,7 +20,6 @@ export function Planning() {
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [folderName, setFolderName] = useState('');
   const [deleting, setDeleting] = useState<{ kind: 'folder' | 'note'; id: string } | null>(null);
-  const [undo, setUndo] = useState<{ data: PlanningData; label: string } | null>(null);
   const [expanded, setExpanded] = useSessionExpansion('planning-folders');
   const [dragging, setDragging] = useState<{kind: 'folder' | 'note'; id: string} | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
@@ -50,7 +49,7 @@ export function Planning() {
     const note: PlanningNote = { id: crypto.randomUUID(), folderId: currentFolderId, title: currentFolderId === null ? nextScratchTitle(data.notes) : '', body: '', order: nextOrder(data.notes.filter(n => n.folderId === currentFolderId)) };
     commit(value => ({ ...value, notes: [...value.notes, note] }));
     expand(currentFolderId ?? 'scratch-pad');
-    setNoteId(note.id); setDeleting(null); setUndo(null);
+    setNoteId(note.id); setDeleting(null);
   }
   function patch(changes: Partial<PlanningNote>) {
     if (!active) return;
@@ -61,7 +60,7 @@ export function Planning() {
     if (!folderName.trim()) return;
     const entry = { id: crypto.randomUUID(), name: folderName.trim(), order: nextOrder(data.folders) };
     commit(value => ({ ...value, folders: [...value.folders, entry] }));
-    setFolderId(entry.id); setNoteId(null); setCreatingFolder(false); setFolderName(''); setDeleting(null); setUndo(null);
+    setFolderId(entry.id); setNoteId(null); setCreatingFolder(false); setFolderName(''); setDeleting(null);
   }
   function remove() {
     if (!deleting) return;
@@ -70,19 +69,9 @@ export function Planning() {
       ? { folders: data.folders.filter(f => f.id === target.id), notes: data.notes.filter(n => n.folderId === target.id) }
       : { folders: [], notes: data.notes.filter(n => n.id === target.id) };
     commit(value => target.kind === 'folder' ? removePlanningFolder(value, target.id) : { ...value, notes: value.notes.filter(n => n.id !== target.id) });
-    setUndo({ data: removed, label: target.kind === 'folder' ? 'Folder removed.' : 'Note removed.' });
     if (target.kind === 'folder') setFolderId(null);
     if (removed.notes.some(n => n.id === noteId)) setNoteId(null);
     setDeleting(null);
-  }
-  function restore() {
-    if (!undo) return;
-    commit(value => {
-      const folders = [...value.folders, ...undo.data.folders.filter(f => !value.folders.some(current => current.id === f.id))];
-      const notes = [...value.notes, ...undo.data.notes.filter(n => !value.notes.some(current => current.id === n.id)).map(n => ({ ...n, folderId: folders.some(f => f.id === n.folderId) ? n.folderId : null }))];
-      return { folders, notes };
-    });
-    setUndo(null);
   }
   function noteButton(note: PlanningNote) {
     return <button key={note.id} className={`planning-note-link ${active?.id === note.id ? 'active' : ''} ${dropTarget === note.id ? 'drop-target' : ''}`} {...dragProps('note', note.id)} onClick={() => openNote(note)}><PlanningIcon/><span>{note.title.trim() || 'Untitled note'}</span>{!!note.checklist?.length&&<small className="checklist-progress">{note.checklist.filter(t=>t.done).length}/{note.checklist.length}</small>}</button>;
@@ -101,7 +90,6 @@ export function Planning() {
       </nav>
     </aside>
     <section className="design-editor planning-editor" aria-label="Planning notepad">
-      {undo && <div className="design-undo" role="status">{undo.label}<button onClick={restore}>Undo</button><button aria-label="Dismiss undo" onClick={() => setUndo(null)}>×</button></div>}
       {deleting && <div className="planning-delete-confirm" role="alert"><p>Delete {deleting.kind} “{deleteName?.trim() || `Untitled ${deleting.kind}`}”{deleting.kind === 'folder' ? ' and all notes inside it' : ''}?</p><button className="design-button danger" onClick={remove}>Delete {deleting.kind}</button><button onClick={() => setDeleting(null)}>Cancel</button></div>}
       {active ? <div key={active.id} className="planning-page">
         <div className="planning-toolbar"><label>Folder<ThemedSelect aria-label="Note folder" value={active.folderId ?? ''} onChange={event => { const id = event.target.value || null; patch({ folderId: id, order: nextOrder(data.notes.filter(n => n.folderId === id)) }); setFolderId(id); expand(id ?? 'scratch-pad'); }}><option value="">Scratch pad</option>{ordered(data.folders).map(f => <option key={f.id} value={f.id}>{f.name || 'Untitled folder'}</option>)}</ThemedSelect></label><button className="design-remove" onClick={() => setDeleting({kind:'note',id:active.id})}>Delete note</button></div>
