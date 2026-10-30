@@ -1,6 +1,10 @@
 /// <reference types="vite/client" />
 
 interface DspWikiBridge {
+  getUpdateState: () => Promise<import('../electron/backend/updates').UpdateState>;
+  checkUpdate: () => Promise<import('../electron/backend/updates').UpdateState>;
+  installUpdate: () => Promise<import('../electron/backend/updates').UpdateState>;
+  onUpdateState: (callback: (state: import('../electron/backend/updates').UpdateState) => void) => () => void;
   loadWorkspace: (legacy: import('./lib/workspace').Workspace, recovery?: { base: import('./lib/workspace').Workspace; data: import('./lib/workspace').Workspace }) => Promise<{view: import('./lib/workspace').SyncView; catalog: import('./lib/catalog').Catalog}>;
   saveWorkspace: (data: import('./lib/workspace').Workspace, base: import('./lib/workspace').Workspace) => Promise<import('./lib/workspace').SyncView>;
   syncWorkspace: () => Promise<void>;

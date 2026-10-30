@@ -124,5 +124,6 @@ export class Persistence {
     this.status = 'pending'; this.message = '';
     await this.persist(); await this.sync(); return this.view();
   }
+  async flush() { await this.writing; await this.sync(); await this.writing; }
   async close() { clearTimeout(this.timer); await this.writing; await this.sync(); await this.writing; await this.db.close(); }
 }

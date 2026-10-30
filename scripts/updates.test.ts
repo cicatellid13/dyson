@@ -1,59 +1,11 @@
-import { test } from 'node:test';
+import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import { startUpdates, updateBeforeOpening } from '../electron/backend/updates';
-const pause = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-function fake(checkForUpdates = async (): Promise<{downloadPromise?: Promise<unknown>} | null> => null) {
-  return { autoDownload: false, autoInstallOnAppQuit: false, allowPrerelease: true, allowDowngrade: true, on() {}, checkForUpdates };
-}
-test('updater is disabled for development and non-Windows platforms', () => {
-  let checks = 0;
-  const updater = fake(async () => { checks++; return null; });
-  startUpdates(updater, { packaged: false, platform: 'win32' })();
-  startUpdates(updater, { packaged: true, platform: 'darwin' })();
-  assert.equal(checks, 0);
-});
-test('downloads in background, installs on quit, and never overlaps downloads', async () => {
-  let checks = 0;
-  let finish!: () => void;
-  const downloadPromise = new Promise<void>(resolve => { finish = resolve; });
-  const updater = fake(async () => { checks++; return { downloadPromise }; });
-  const stop = startUpdates(updater, { packaged: true, platform: 'win32' }, 5);
-  try {
-    await pause(30);
-    assert.equal(checks, 1);
-    assert.equal(updater.autoDownload, true);
-    assert.equal(updater.autoInstallOnAppQuit, true);
-    assert.equal(updater.allowPrerelease, false);
-    assert.equal(updater.allowDowngrade, false);
-    finish();
-    await pause(30);
-    assert.ok(checks > 1);
-  } finally { finish(); stop(); }
-});
-test('network and download failures are retried without unhandled rejections', async () => {
-  let checks = 0;
-  const updater = fake(async () => {
-    if (++checks === 1) throw Error('Offline');
-    return { downloadPromise: Promise.reject(Error('Interrupted download')) };
-  });
-  const stop = startUpdates(updater, { packaged: true, platform: 'win32' }, 5);
-  try { await pause(35); assert.ok(checks > 1); } finally { stop(); }
-});
-
-test('startup installs a downloaded update and relaunches before editing begins',async()=>{
- let installed=false; const notices:string[]=[];
- const updater={...fake(async()=>({updateInfo:{version:'1.2.12'},downloadPromise:Promise.resolve()})),quitAndInstall:(silent?:boolean,relaunch?:boolean)=>{assert.equal(silent,true);assert.equal(relaunch,true);installed=true;}};
- assert.equal(await updateBeforeOpening(updater,{packaged:true,platform:'win32'},v=>notices.push(v)),true);
- assert.equal(installed,true);assert.deepEqual(notices,['1.2.12']);
-});
-test('slow startup download opens app and never restarts an active session later',async()=>{
- let finish!:()=>void;let installs=0;
- const updater={...fake(async()=>({downloadPromise:new Promise<void>(resolve=>{finish=resolve;})})),quitAndInstall:()=>{installs++;}};
- assert.equal(await updateBeforeOpening(updater,{packaged:true,platform:'win32'},()=>{},5),false);
- finish();await pause(10);assert.equal(installs,0);
-});
-test('offline startup and Mac startup continue without installation',async()=>{
- const updater={...fake(async()=>{throw Error('offline');}),quitAndInstall:()=>{throw Error('must not install');}};
- assert.equal(await updateBeforeOpening(updater,{packaged:true,platform:'win32'},()=>{}),false);
- assert.equal(await updateBeforeOpening(updater,{packaged:true,platform:'darwin'},()=>{}),false);
-});
+import {createUpdates} from '../electron/backend/updates';
+function fake(){const listeners:Record<string,(value:any)=>void>={};return {autoDownload:true,autoInstallOnAppQuit:true,allowPrerelease:true,allowDowngrade:true,on:(event:string,fn:(value:any)=>void)=>{listeners[event]=fn;},checkForUpdates:async()=>{listeners['update-available']({version:'1.2.27'});},downloadUpdate:async()=>{},quitAndInstall:(_silent?:boolean,_force?:boolean)=>{},listeners};}
+test('checks never download or install, and disables install on quit',async()=>{const u=fake();u.downloadUpdate=async()=>{assert.fail('automatic download');};u.quitAndInstall=()=>assert.fail('automatic install');const c=createUpdates(u,{packaged:true,platform:'win32'},()=>{},async()=>{});try{await c.check();assert.equal(c.getState().status,'available');assert.equal(u.autoDownload,false);assert.equal(u.autoInstallOnAppQuit,false);}finally{c.stop();}});
+test('explicit update downloads, saves and opens visible installer in order',async()=>{const u=fake(),events:string[]=[];u.downloadUpdate=async()=>{events.push('download');};u.quitAndInstall=(silent,force)=>{assert.equal(silent,false);assert.equal(force,true);events.push('install');};const c=createUpdates(u,{packaged:true,platform:'win32'},()=>{},async()=>{events.push('save');});try{await c.check();await c.install();assert.deepEqual(events,['download','save','install']);}finally{c.stop();}});
+test('failed download or save does not install and can be retried',async()=>{const u=fake();let installs=0;u.quitAndInstall=()=>{installs++;};const c=createUpdates(u,{packaged:true,platform:'win32'},()=>{},async()=>{throw Error('save');});try{await c.check();await c.install();assert.equal(installs,0);assert.equal(c.getState().status,'error');}finally{c.stop();}});
+test('Mac and development never invoke Windows updater',async()=>{for(const env of [{packaged:true,platform:'darwin'},{packaged:false,platform:'win32'}]){const u=fake();u.checkForUpdates=async()=>{assert.fail('Windows updater');};const c=createUpdates(u,env,()=>{},async()=>{});try{await c.check();await c.install();assert.equal(c.getState().status,'idle');}finally{c.stop();}}});
+test('offline checks show an error and later checks recover',async()=>{const u=fake(),check=u.checkForUpdates;u.checkForUpdates=async()=>{throw Error('offline');};const c=createUpdates(u,{packaged:true,platform:'win32'},()=>{},async()=>{});try{await c.check();assert.equal(c.getState().status,'error');u.checkForUpdates=check;await c.check();assert.equal(c.getState().status,'available');}finally{c.stop();}});
+test('concurrent checks coalesce',async()=>{const u=fake();let resolve!:()=>void,calls=0;u.checkForUpdates=async()=>{calls++;await new Promise<void>(r=>resolve=r);};const c=createUpdates(u,{packaged:true,platform:'win32'},()=>{},async()=>{});try{const a=c.check(),b=c.check();assert.equal(calls,1);resolve();await Promise.all([a,b]);}finally{c.stop();}});
+test('download failure leaves workspace open; repeated install clicks cannot overlap',async()=>{const u=fake();let reject!:(e:Error)=>void,calls=0;u.downloadUpdate=async()=>{calls++;await new Promise<void>((_,r)=>reject=r);};u.quitAndInstall=()=>assert.fail('must not install');const c=createUpdates(u,{packaged:true,platform:'win32'},()=>{},async()=>assert.fail('must not save yet'));try{await c.check();const a=c.install();await c.install();assert.equal(calls,1);reject(Error('offline'));await a;assert.equal(c.getState().status,'error');}finally{c.stop();}});

@@ -63,10 +63,10 @@ The setup script obtains checksum-verified Node.js build tools, installs locked 
 
 ### Windows
 
-- **At startup:** check for a stable release before opening the editing workspace. If an update is found, show “Updating to version …” with an OK button; the notice dismisses after five seconds. The app downloads, installs and relaunches automatically when this finishes within the startup window.
-- **Startup timeout:** after 30 seconds the workspace opens rather than blocking indefinitely. A late download does not restart an active session; installation is deferred until quit.
-- **While open:** check every four hours and download available updates in the background. Do not interrupt editing. A downloaded update installs when the app quits; the next launch uses the new version. The five-second notice is for the startup flow, not a background-release announcement.
-- Offline or failed checks are retried. Development builds do not run the updater.
+- **At startup and every four hours:** check for a stable release without downloading or installing it. A small update icon beside the version highlights when a newer release is available.
+- **On demand:** click the icon to check. Choose **Update** to download, save pending workspace changes, and open the installer visibly; choose **Later** to keep working. Cached downloads can be reused by the updater.
+- Updates do not install automatically on startup or quit. Failed checks/downloads show an error with retry and a release-download fallback. Windows can still ask for permission to run the installer.
+- Development builds do not run the updater. The Mac button explains the manual rebuild requirement; Windows installers are not offered as Mac updates.
 
 Pushing to `main` automatically runs the Windows build and publishes a release. CI uses the source version if it is newer than published releases; otherwise it increments the patch in the current release series. The installer, blockmap and `latest.yml` are uploaded to a draft before publication. Failed builds do not publish incomplete updates. The public repository allows credential-free update downloads. Installers are unsigned and may trigger Windows reputation warnings.
 

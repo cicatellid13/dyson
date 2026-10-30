@@ -75,3 +75,5 @@ export async function resolveWorkspace(choice: 'local' | 'cloud') {
 }
 export async function retrySync() { await writes; await window.dspWiki?.syncWorkspace(); }
 export function useWorkspace() { return useSyncExternalStore(listener => { listeners.add(listener); return () => listeners.delete(listener); }, () => state); }
+
+export async function flushWorkspaceWrites() { await writes; if(state.error) throw Error('Workspace could not be saved.'); }

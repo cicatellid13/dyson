@@ -1,5 +1,13 @@
 import { contextBridge, ipcRenderer } from 'electron';
 contextBridge.exposeInMainWorld('dspWiki', {
+  getUpdateState: () => ipcRenderer.invoke('update-state'),
+  checkUpdate: () => ipcRenderer.invoke('update-check'),
+  installUpdate: () => ipcRenderer.invoke('update-install'),
+  onUpdateState: (callback: (state: unknown) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, state: unknown) => callback(state);
+    ipcRenderer.on('update-state', listener);
+    return () => ipcRenderer.removeListener('update-state', listener);
+  },
   loadWorkspace: (legacy: unknown, recovery: unknown) => ipcRenderer.invoke('workspace-load', legacy, recovery),
   saveWorkspace: (data: unknown, base: unknown) => ipcRenderer.invoke('workspace-save', data, base),
   syncWorkspace: () => ipcRenderer.invoke('workspace-sync'),
