@@ -19,8 +19,8 @@ export function ItemOverview({ item, items }: { item: Item; items: Map<number, I
     <div ref={content} id={`overview-${item.id}`} className={`overview-copy ${expanded ? 'expanded' : ''}`}>
       {item.overview.map((paragraph, index) => <p key={index}>{paragraph.map((segment, part) => {
         const linked = segment.itemId ? items.get(segment.itemId) : undefined;
-        if (linked) return <button key={part} className="overview-item" onClick={() => actions.navigate(linked.id)} {...actions.dragProps(linked.id)}>
-          {linked.icon && <img src={`${import.meta.env.BASE_URL}${linked.icon}`} alt=""/>}{linked.name}</button>;
+        if (linked) return <button key={part} className="overview-item" data-preview-id={linked.id} onClick={() => actions.navigate(linked.id)} {...actions.dragProps(linked.id)}>
+          {linked.icon && <img src={`${import.meta.env.BASE_URL}${linked.icon}`} alt=""/>}<span className="preview-name">{linked.name}</span></button>;
         return segment.bold ? <strong key={part}>{segment.text}</strong> : <span key={part}>{segment.text}</span>;
       })}</p>)}
     </div>

@@ -16,4 +16,4 @@ export function ItemAccess({id,name,children}:{id:number;name?:string;children:R
  return <span className="item-access" {...actions.dragProps(id)}>{children}<ItemJump id={id} name={name}/></span>;
 }
 
-export function ItemLink({id,name,children}:{id:number;name?:string;children:ReactNode}){const actions=useItemAccess();return <button type="button" className="logistics-item-link" aria-label={name} {...actions.dragProps(id)} onClick={()=>actions.navigate(id)}>{children}</button>;}
+export function ItemLink({id,name,children}:{id:number;name?:string;children:ReactNode}){const actions=useItemAccess();return <button type="button" className="logistics-item-link" data-preview-id={id} aria-label={name} {...actions.dragProps(id)} onClick={()=>actions.navigate(id)}>{children}</button>;}
