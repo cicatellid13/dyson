@@ -9,13 +9,13 @@ export function AppTooltips(){
   const show=(event:Event)=>{
    const next=event.target instanceof Element?event.target.closest<HTMLElement>('[data-tooltip]'):null;
    if(next===active)return;hide();if(!next?.dataset.tooltip)return;active=next;
-   timer=setTimeout(()=>{if(next.isConnected)setTarget(next);},100);
+   timer=setTimeout(()=>{if(next.isConnected && next.dataset.tooltip)setTarget(next);},100);
   };
   const leave=(event:MouseEvent)=>{if(active&&!(event.relatedTarget instanceof Node&&active.contains(event.relatedTarget)))hide();};
   const key=(event:KeyboardEvent)=>{if(event.key==='Escape')hide();};
   document.addEventListener('mouseover',show);document.addEventListener('mouseout',leave);document.addEventListener('focusin',show);document.addEventListener('focusout',hide);
-  document.addEventListener('pointerdown',hide,true);document.addEventListener('scroll',hide,true);document.addEventListener('keydown',key);window.addEventListener('blur',hide);window.addEventListener('resize',hide);
-  return ()=>{hide();document.removeEventListener('mouseover',show);document.removeEventListener('mouseout',leave);document.removeEventListener('focusin',show);document.removeEventListener('focusout',hide);document.removeEventListener('pointerdown',hide,true);document.removeEventListener('scroll',hide,true);document.removeEventListener('keydown',key);window.removeEventListener('blur',hide);window.removeEventListener('resize',hide);};
+  document.addEventListener('click',hide,true);document.addEventListener('pointerdown',hide,true);document.addEventListener('scroll',hide,true);document.addEventListener('keydown',key);window.addEventListener('blur',hide);window.addEventListener('resize',hide);
+  return ()=>{hide();document.removeEventListener('mouseover',show);document.removeEventListener('mouseout',leave);document.removeEventListener('focusin',show);document.removeEventListener('focusout',hide);document.removeEventListener('click',hide,true);document.removeEventListener('pointerdown',hide,true);document.removeEventListener('scroll',hide,true);document.removeEventListener('keydown',key);window.removeEventListener('blur',hide);window.removeEventListener('resize',hide);};
  },[]);
  useLayoutEffect(()=>{
   if(!target||!ref.current)return;
@@ -25,5 +25,5 @@ export function AppTooltips(){
   const previous=target.getAttribute('aria-describedby');target.setAttribute('aria-describedby',[previous,'app-tooltip'].filter(Boolean).join(' '));
   return ()=>{if(previous)target.setAttribute('aria-describedby',previous);else target.removeAttribute('aria-describedby');};
  },[target]);
- return target&&createPortal(<div ref={ref} id="app-tooltip" className="app-tooltip" role="tooltip">{target.dataset.tooltip}</div>,target.closest('dialog')??document.body);
+ return target?.dataset.tooltip ? createPortal(<div ref={ref} id="app-tooltip" className="app-tooltip" role="tooltip">{target.dataset.tooltip}</div>,target.closest('dialog')??document.body) : null;
 }
