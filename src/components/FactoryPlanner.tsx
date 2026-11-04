@@ -2,7 +2,7 @@ import { ItemLink } from './ItemAccess';
 import { SaveFactory } from './SavedFactories';
 import type { SavedFactory } from '../lib/savedFactories';
 import { useEffect, useState } from 'react';
-import { recipesFor, type Catalog, type Item } from '../lib/catalog';
+import { pairs, recipesFor, type Catalog, type Item } from '../lib/catalog';
 import { BELTS, FACILITIES, SORTERS } from '../lib/factoryEquipment';
 import { calculateFactory, type Stream } from '../lib/factoryPlanner';
 import { ItemPicker } from './ItemPicker';
@@ -16,8 +16,8 @@ const rate=(n:number)=>`${number(n)}/s · ${number(n*60)}/min`;
 function Gauge({label,value}:{label:string;value:number}) {
   return <div className="planner-gauge"><span>{label}<b>{number(value*100)}%</b></span><meter min={0} max={1} value={value} aria-label={label}/></div>;
 }
-function ResourceRows({title,streams,items}:{title:string;streams:Stream[];items:Map<number,Item>}) {
-  return <section className="planner-resources"><h4>{title}</h4>{streams.map(s=><div className="planner-resource" key={s.id}><ItemLink id={s.id} name={items.get(s.id)?.name}>{items.get(s.id)?.icon&&<img src={`${import.meta.env.BASE_URL}${items.get(s.id)!.icon}`} alt=""/>}<strong>{items.get(s.id)?.name??`Item ${s.id}`}</strong></ItemLink><span>{rate(s.rate)}<small>{s.belts} belt{s.belts===1?'':'s'} · {number(s.beltUtilization*100)}% used</small></span><span>{s.sorters} sorters<small>{s.sortersPerMachine} per machine</small></span></div>)}</section>;
+function ResourceRows({title,streams,items,counts}:{title:string;streams:Stream[];items:Map<number,Item>;counts?:Map<number,number>}) {
+  return <section className="planner-resources"><h4>{title}</h4>{streams.map(s=><div className="planner-resource" key={s.id}><ItemLink id={s.id} name={items.get(s.id)?.name}><span className="item-icon">{items.get(s.id)?.icon&&<img src={`${import.meta.env.BASE_URL}${items.get(s.id)!.icon}`} alt=""/>}{counts?.has(s.id)&&<small className="icon-quantity" aria-label={`${counts.get(s.id)} per recipe batch`}>{counts.get(s.id)}</small>}</span><strong>{items.get(s.id)?.name??`Item ${s.id}`}</strong></ItemLink><span>{rate(s.rate)}<small>{s.belts} belt{s.belts===1?'':'s'} · {number(s.beltUtilization*100)}% used</small></span><span>{s.sorters} sorters<small>{s.sortersPerMachine} per machine</small></span></div>)}</section>;
 }
 /** Both surfaces deliberately instantiate the same controls and calculator with independent state. */
 function Calculator({catalog,item,compact=false,saved,planetId}:{catalog:Catalog;item:Item;compact?:boolean;saved?:SavedFactory;planetId?:string}) {
@@ -56,7 +56,7 @@ function Calculator({catalog,item,compact=false,saved,planetId}:{catalog:Catalog
       <div className="planner-stats"><div><small>{mode==='machines'?'Selected facilities':'Recommended facilities'}</small><strong>{number(result.machines)}</strong><span>{items.get(facility.id)?.name}</span></div><div><small>Target output</small><strong>{number(result.target*60)}<em>/min</em></strong><span>{number(result.target)} items/s</span></div><div><small>Expected sustainable output</small><strong>{number(result.sustainable*60)}<em>/min</em></strong><span>With the supporting logistics below</span></div></div>
       <div className="planner-gauges"><Gauge label="Machine utilization" value={result.machineUtilization}/><Gauge label="Selected output belts" value={result.beltUtilization}/></div>
       <p className="planner-caption">Per facility: {rate(result.perMachine)} · Installed capacity: {rate(result.installed)}</p>
-      <ResourceRows title="Input requirements" streams={result.inputs} items={items}/><ResourceRows title="Outputs & byproducts" streams={result.outputs} items={items}/>
+      <ResourceRows title="Input requirements" streams={result.inputs} items={items} counts={new Map(pairs(recipe!.inputs).map(input=>[input.id,input.count]))}/><ResourceRows title="Outputs & byproducts" streams={result.outputs} items={items}/>
       <div className="planner-logistics"><strong>{result.inputs.reduce((n,s)=>n+s.belts,0)} input belts · {result.outputs.reduce((n,s)=>n+s.belts,0)} output belts · {result.sorters} sorters</strong><span>Each sorter: {rate(result.sorterRate)} at {reach}-grid reach</span></div>
       {mode==='machines'&&result.beltLimited&&<p className="planner-warning">One belt per item limits output: {result.limitingBeltItems.map(id=>items.get(id)?.name??`Item ${id}`).join(', ')}. Your {result.machines} facilities run at {number(result.machineUtilization*100)}% capacity.</p>}
       {mode==='machines'&&result.sorterLimited?<p className="planner-warning">Sorter capacity limits these facilities. Faster sorters or shorter reach may increase output.</p>:mode==='infrastructure'&&result.machines>result.machineOnlyCount&&<p className="planner-warning">{result.notes[0]}</p>}

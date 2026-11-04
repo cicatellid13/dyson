@@ -187,3 +187,14 @@ test('multi-planet linking creates each mirror once and graph includes every pee
 test('deselecting a linked destination only removes its mirror',()=>{const data=linkRoute(multiFixture(),'earth','exports','route');const entry=data.sections[1].exports[0];const next=updateTrades(data,'earth','exports',[{...entry,planetIds:['venus'],planetId:'venus'}]);assert.equal(next.sections.find(s=>s.id==='mars')!.imports.length,0);assert.equal(next.sections.find(s=>s.id==='venus')!.imports.length,1);assert.deepEqual(routePlanets(next.sections[1].exports[0]),['venus']);});
 test('editing any mirror synchronizes amounts across linked peers',()=>{const data=linkRoute(multiFixture(),'earth','exports','route');const mars=data.sections.find(s=>s.id==='mars')!;const next=updateTrades(data,'mars','imports',[{...mars.imports[0],amount:'240'}]);assert.equal(next.sections[1].exports[0].amount,'240');assert.equal(next.sections.find(s=>s.id==='venus')!.imports[0].amount,'240');});
 test('removing one linked mirror preserves other destinations; unlink-only preserves peers',()=>{const data=linkRoute(multiFixture(),'earth','exports','route');const next=updateTrades(data,'mars','imports',[]);assert.deepEqual(routePlanets(next.sections[1].exports[0]),['venus']);assert.equal(next.sections.find(s=>s.id==='venus')!.imports.length,1);const unlinked=removeRouteSide(data,'earth','exports','route');assert.equal(unlinked.sections[1].exports.length,0);for(const id of ['mars','venus']){const p=unlinked.sections.find(s=>s.id===id)!;assert.equal(p.imports.length,1);assert.equal(p.imports[0].linkId,undefined);}});
+
+test('location to-dos round-trip and merge with independent notes edits', () => {
+ const base=fixture(), local=copy(base), remote=copy(base);
+ local.design.sections[0].checklist=[{id:'task',text:'Add power',done:false,type:'power'}];
+ remote.design.sections[0].notes='Keep this note';
+ const merged=mergeWorkspace(base,local,remote);
+ assert.deepEqual(decode(encode(merged)).design.sections[0].checklist,local.design.sections[0].checklist);
+ assert.equal(merged.design.sections[0].notes,'Keep this note');
+ const invalid=copy(local);invalid.design.sections[0].checklist![0].type='invalid' as never;
+ assert.throws(()=>decode(encode(invalid)));
+});

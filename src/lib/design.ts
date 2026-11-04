@@ -1,3 +1,4 @@
+import { validatePlanning, type ChecklistItem } from './planning';
 import { validateFactories, type SavedFactory } from './savedFactories';
 export const DESIGN_KEY = 'dsp-design-v1';
 export type TradeEntry = {
@@ -18,6 +19,7 @@ export type DesignSection = {
   parentId: string | null;
   name: string;
   notes: string;
+  checklist?: ChecklistItem[];
   factories?: Record<string,SavedFactory>;
   planetType?: string;
   specializations?: string[];
@@ -50,6 +52,7 @@ export function parseDesign(raw: string | null): DesignData {
     if (s.planetType !== undefined && (typeof s.planetType !== 'string' || s.planetType.length > 120)) throw Error('Invalid planet type.');
     if (s.specializations !== undefined && (!Array.isArray(s.specializations) || s.specializations.length>12 || s.specializations.some(t=>typeof t!=='string'||!t.trim()||t.length>40))) throw Error('Invalid specializations.');
     if (s.order !== undefined && !Number.isFinite(s.order)) throw Error('Invalid section order.');
+    if (s.checklist !== undefined) validatePlanning({folders:[],notes:[{id:'validation',folderId:null,title:'',body:'',checklist:s.checklist}]});
     validateFactories(s.factories);
     if(s.kind!=='planet'&&s.factories&&Object.keys(s.factories).length)throw Error('Factory plans belong to planets.');
     ids.add(s.id);

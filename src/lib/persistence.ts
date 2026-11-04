@@ -12,7 +12,8 @@ let initialization: Promise<void> | undefined;
 let writes = Promise.resolve();
 let lastRemoval:{before:Workspace;after:Workspace}|null=null;
 let restoring=false;
-export function dismissRemoval(){lastRemoval=null;state={...state,undoLabel:undefined,undoError:undefined};emit();}
+let undoTimer: ReturnType<typeof setTimeout> | undefined;
+export function dismissRemoval(){clearTimeout(undoTimer);lastRemoval=null;state={...state,undoLabel:undefined,undoError:undefined};emit();}
 export function undoRemoval(){if(!lastRemoval)return;try{const next=restoreRemoval(lastRemoval.before,lastRemoval.after,state.view.data);restoring=true;updateWorkspace(()=>next);if(!state.error)dismissRemoval();}catch(error){state={...state,undoError:error instanceof Error?error.message:"Unable to undo."};emit();}finally{restoring=false;}}
 let pending = 0;
 const recoveryKey = 'dsp-workspace-recovery';
@@ -56,7 +57,7 @@ export function updateWorkspace(change: (current: Workspace) => Workspace) {
     state = { ...state, error: 'Local recovery storage is full or unavailable. This edit was not applied.' }; emit(); return;
   }
   const removed=restoring?null:removalLabel(current,next);
-  if(removed){lastRemoval={before:structuredClone(current),after:structuredClone(next)};state={...state,undoLabel:removed,undoError:undefined};}
+  if(removed){clearTimeout(undoTimer);undoTimer=setTimeout(dismissRemoval,30000);lastRemoval={before:structuredClone(current),after:structuredClone(next)};state={...state,undoLabel:removed,undoError:undefined};}
   state = { ...state, view: { ...state.view, data: next, status: state.view.status === 'conflict' ? 'conflict' : 'pending' }, error: '' };
   pending++; emit();
   writes = writes.then(async () => {
