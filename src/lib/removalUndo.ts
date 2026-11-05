@@ -26,6 +26,8 @@ export function removalLabel(a:Workspace,b:Workspace):string|null{
  const section=a.design.sections.find(s=>!b.design.sections.some(t=>t.id===s.id));if(section)return section.kind==='planet'?'Planet removed':'System removed';
  if(a.planning.notes.some(n=>!b.planning.notes.some(t=>t.id===n.id))||a.planning.folders.some(n=>!b.planning.folders.some(t=>t.id===n.id)))return 'Note or folder removed';
  for(const s of a.design.sections){const next=b.design.sections.find(t=>t.id===s.id);if(!next)continue;
+ const removedTasks = (s.checklist ?? []).filter(task => !(next.checklist ?? []).some(entry => entry.id === task.id));
+ if (removedTasks.length) return removedTasks.length === 1 ? 'To-do item removed' : 'To-do items removed';
  if(Object.keys(s.factories??{}).some(id=>!next.factories?.[id]))return 'Factory removed';
  for(const direction of ['imports','exports'] as const)if(s[direction].some(e=>!next[direction].some(t=>t.id===e.id)))return direction==='imports'?'Import removed':'Export removed';}
  return a.favorites.some(id=>!b.favorites.includes(id))?'Favorite removed':null;

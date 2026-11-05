@@ -1,3 +1,4 @@
+import { PriorityTasks } from './PriorityTasks';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 export function AppTooltips(){
@@ -25,5 +26,5 @@ export function AppTooltips(){
   const previous=target.getAttribute('aria-describedby');target.setAttribute('aria-describedby',[previous,'app-tooltip'].filter(Boolean).join(' '));
   return ()=>{if(previous)target.setAttribute('aria-describedby',previous);else target.removeAttribute('aria-describedby');};
  },[target]);
- return target?.dataset.tooltip ? createPortal(<div ref={ref} id="app-tooltip" className="app-tooltip" role="tooltip">{target.dataset.tooltip}</div>,target.closest('dialog')??document.body) : null;
+ return target?.dataset.tooltip ? createPortal(<div ref={ref} id="app-tooltip" className="app-tooltip" role="tooltip">{target.dataset.priorityTasks ? <PriorityTasks summary={JSON.parse(target.dataset.priorityTasks)}/> : target.dataset.tooltip}</div>,target.closest('dialog')??document.body) : null;
 }

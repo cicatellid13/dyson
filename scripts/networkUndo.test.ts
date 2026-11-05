@@ -15,3 +15,38 @@ test('ordinary edits do not create removal actions',()=>{const {w}=fixture();con
 test('network search finds recorded routes and factory inputs and outputs separately',()=>{const {w,a}=fixture();a.exports=[{id:'export',itemId:3,amount:'60',unit:'items/min',destination:''}];a.factories={factory:{id:'factory',name:'Assembly',itemId:3,recipeId:1,facilityId:2304,beltId:2001,sorterId:2013,reach:1,mode:'infrastructure',target:60,unit:'minute',machineCount:1,oneBeltPerItem:false}};const catalog={recipes:[{id:1,name:'Recipe',type:'ASSEMBLE',seconds:3,inputs:[1,2],outputs:[3,1,4,1]}]} as Catalog;assert.deepEqual(findInNetwork(w.design,catalog,3).map(r=>r.kind),['Exports','Produces']);assert.equal(findInNetwork(w.design,catalog,1)[0].kind,'Uses');assert.equal(findInNetwork(w.design,catalog,4)[0].kind,'Produces');assert.deepEqual(findInNetwork(w.design,catalog,99),[]);a.factories.factory.facilityId=999;assert.equal(findInNetwork(w.design,catalog,1)[0].detail,'Assembly · rate unavailable');});
 
 test('network tooltips contain specified metrics only',()=>{const {w,a}=fixture();a.imports=[{id:'no-rate',itemId:3,amount:'',unit:'items/min',destination:''},{id:'rate',itemId:3,amount:'900',unit:'items/min',destination:''}];const rows=findInNetwork(w.design,{recipes:[]} as unknown as Catalog,3);assert.equal(rows[0].metric,undefined);assert.equal(rows[1].metric,'900 items/min');});
+
+test('to-do undo restores deleted tasks while preserving later task edits', () => {
+  const {w, a} = fixture();
+  a.checklist = [
+    {id:'first', text:'Build smelters', done:true, type:'production'},
+    {id:'second', text:'Import ore', done:false, type:'import'},
+  ];
+  const after = structuredClone(w);
+  after.design.sections[1].checklist!.shift();
+  const current = structuredClone(after);
+  current.design.sections[1].checklist![0].text = 'Import more ore';
+  const restored = restoreRemoval(w, after, current);
+  assert.equal(removalLabel(w, after), 'To-do item removed');
+  assert.deepEqual(restored.design.sections[1].checklist, [a.checklist[0], {...a.checklist[1], text:'Import more ore'}]);
+  const edited = structuredClone(w);
+  edited.design.sections[1].checklist![0].done = false;
+  assert.equal(removalLabel(w, edited), null);
+});
+
+test('to-do reordering preserves filtered-out slots and does not create undo removal', async () => {
+  const {reorderTodos} = await import('../src/lib/reorderTodos');
+  const {w, a} = fixture();
+  a.checklist = [
+    {id:'a', text:'First', done:false, type:'production'},
+    {id:'hidden', text:'Power', done:false, type:'power'},
+    {id:'b', text:'Second', done:true, type:'production'},
+    {id:'c', text:'Third', done:false, type:'production'},
+  ];
+  const reordered = reorderTodos(a.checklist, ['a','b','c'], 'a', 'c');
+  assert.deepEqual(reordered.map(task => task.id), ['b','hidden','c','a']);
+  const after = structuredClone(w);
+  after.design.sections[1].checklist = reordered;
+  assert.equal(removalLabel(w, after), null);
+  assert.equal(reorderTodos(a.checklist, ['a','b'], 'missing', 'b'), a.checklist);
+});

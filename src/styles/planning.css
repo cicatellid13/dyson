@@ -26,3 +26,6 @@
 .todo-add .todo-add-button{width:62px;height:28px;padding:0;font-size:25px;line-height:1;display:grid;place-items:center}.todo-type-menu .todo-type-icon{width:42px;height:26px;padding:0;display:flex;align-items:center;justify-content:center;font-size:17px}.todo-type-menu .logistics-arrow{width:16px;height:16px}
 
 .todo-type-menu{align-items:center}.todo-type-menu .todo-type-cancel{display:flex;align-items:center;justify-content:center;width:42px;height:26px;padding:0}.todo-add-button svg,.todo-type-cancel svg{display:block;flex-shrink:0}
+.todo-drag-handle{display:grid;place-items:center;flex-shrink:0;width:26px;height:28px;padding:0;color:#94aaa0;border-radius:5px;background:transparent}
+.todo-drag-handle:hover{background:#294238;color:#c2dfcf}
+.checklist-row.todo-drop-target{outline:1px solid #9bd5ae;outline-offset:2px;border-radius:5px;background:#20392f}

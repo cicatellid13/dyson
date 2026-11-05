@@ -21,6 +21,7 @@ export type DesignSection = {
   notes: string;
   checklist?: ChecklistItem[];
   factories?: Record<string,SavedFactory>;
+  priority?: boolean;
   planetType?: string;
   specializations?: string[];
   order?: number;
@@ -49,6 +50,7 @@ export function parseDesign(raw: string | null): DesignData {
   for (const s of data.sections) {
     if (!s || typeof s.id !== 'string' || ids.has(s.id) || !['planet', 'system'].includes(s.kind) ||
       typeof s.name !== 'string' || typeof s.notes !== 'string' || (s.parentId !== null && typeof s.parentId !== 'string')) throw Error('Invalid design section.');
+    if (s.priority !== undefined && typeof s.priority !== 'boolean') throw Error('Invalid planet priority.');
     if (s.planetType !== undefined && (typeof s.planetType !== 'string' || s.planetType.length > 120)) throw Error('Invalid planet type.');
     if (s.specializations !== undefined && (!Array.isArray(s.specializations) || s.specializations.length>12 || s.specializations.some(t=>typeof t!=='string'||!t.trim()||t.length>40))) throw Error('Invalid specializations.');
     if (s.order !== undefined && !Number.isFinite(s.order)) throw Error('Invalid section order.');
