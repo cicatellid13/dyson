@@ -45,7 +45,7 @@ export function LogisticsSearch({ data, catalog }: { data: DesignData; catalog: 
   }
 
   return <div className="logistics-search">
-    <div className="logistics-search-field">
+    <div className="item-picker-field logistics-search-field">
       <input type="search" aria-label="Search logistics network" placeholder="Search network…" value={query} onChange={event => setQuery(event.target.value)}/>
       {query && <button type="button" aria-label="Clear network search" onClick={() => setQuery('')}>×</button>}
     </div>
