@@ -25,3 +25,7 @@
 .sorter-reach-icon{flex-shrink:0;color:#a3d8c8}
 
 .saved-factory-description{display:flex;align-items:center;gap:8px;margin-top:9px;color:#a5c1b4}.factory-info{display:grid;place-items:center;padding:2px;color:#9fd4bc}.saved-planet-link{padding:0;color:#a8debd;text-decoration:underline;text-underline-offset:3px}.factory-totals .themed-select:disabled{opacity:.55;cursor:default}
+.factory-status-switch{display:inline-flex;gap:2px;padding:3px;margin:9px 0 5px;background:#0d191d;border:1px solid #344d43;border-radius:7px}
+.factory-status-switch button{padding:4px 11px;border:0;border-radius:4px;font-size:12px;color:#91aaa0;background:transparent}
+.factory-status-switch button[aria-pressed=true]{background:#29483a;color:#c0e3cb}
+.factory-status-switch button:hover{color:#ddede4}

@@ -124,3 +124,32 @@ test('cross-system exports create a matching import and keep paired edits synchr
  assert.equal(data.sections.find(s=>s.id===b.id).imports[0].amount,'120');
  assert.equal(routeReadiness(data.sections,a.id,'exports',data.sections.find(s=>s.id===a.id).exports[0]).ready,true);
 });
+
+test('linking an import reuses the export serving another planet in the same system', () => {
+ const system=createSection('Alphecca','system'),sourceSystem=createSection('Sadira','system');
+ const source=createSection('Source','planet',sourceSystem.id),one=createSection('One','planet',system.id),two=createSection('Two','planet',system.id);
+ source.exports=[{id:'out',itemId:1210,amount:'60',unit:'items/min',destination:'',planetIds:[one.id],systemIds:[system.id]}];
+ let data=linkRoute({version:1,sections:[system,sourceSystem,source,one,two]},source.id,'exports','out');
+ data.sections.find(p=>p.id===two.id).imports=[{id:'in',itemId:1210,amount:'',unit:'items/min',destination:'',planetIds:[source.id]}];
+ data=linkRoute(data,two.id,'imports','in');
+ const exports=data.sections.find(p=>p.id===source.id).exports;
+ assert.equal(exports.length,1);
+ assert.deepEqual(exports[0].planetIds,[one.id,two.id]);
+ assert.equal(data.sections.find(p=>p.id===two.id).imports[0].amount,'60');
+ assert.equal(exports[0].links[two.id],data.sections.find(p=>p.id===two.id).imports[0].links[source.id]);
+ assert.deepEqual(linkRoute(data,two.id,'imports','in'),data);
+ data=updateTrades(data,two.id,'imports',[]);
+ assert.deepEqual(data.sections.find(p=>p.id===source.id).exports[0].planetIds,[one.id]);
+});
+
+test('linking an export reuses an import serving the same system, including legacy selections', () => {
+ const system=createSection('Source system','system'),other=createSection('Destination system','system');
+ const one=createSection('One','planet',system.id),two=createSection('Two','planet',system.id),dest=createSection('Destination','planet',other.id);
+ dest.imports=[{id:'existing',itemId:1210,amount:'',unit:'items/min',destination:'',planetId:one.id}];
+ two.exports=[{id:'new',itemId:1210,amount:'',unit:'items/min',destination:'',planetId:dest.id}];
+ const data=linkRoute({version:1,sections:[system,other,one,two,dest]},two.id,'exports','new');
+ const imports=data.sections.find(p=>p.id===dest.id).imports;
+ assert.equal(imports.length,1);
+ assert.deepEqual(imports[0].planetIds,[one.id,two.id]);
+ assert.ok(imports[0].systemIds.includes(system.id));
+});

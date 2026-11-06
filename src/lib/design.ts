@@ -129,14 +129,27 @@ export function linkExport(data:DesignData,ownerId:string,entryId:string):Design
 export function linkRoute(data:DesignData,ownerId:string,direction:'imports'|'exports',entryId:string):DesignData {
  const owner=data.sections.find(s=>s.id===ownerId&&s.kind==='planet');const entry=owner?.[direction].find(e=>e.id===entryId);if(!owner||!entry)return data;
  const opposite=direction==='imports'?'exports':'imports';const links={...routeLinks(entry)};let sections=data.sections;
+ let existingRate: Pick<TradeEntry, 'amount' | 'unit'> | undefined;
  for(const peerId of routePlanets(entry)){
   const peer=sections.find(s=>s.id===peerId&&s.kind==='planet'&&s.id!==ownerId);if(!peer||links[peerId])continue;
-  const match=peer[opposite].find(e=>e.itemId===entry.itemId&&routePlanets(e).includes(ownerId)&&!routeLinks(e)[ownerId]&&e.amount===entry.amount&&e.unit===entry.unit);
-  const link=crypto.randomUUID();links[peerId]=link;
-  const mirror=match?selections(match,routePlanets(match),{...routeLinks(match),[ownerId]:link}):selections({...entry,id:crypto.randomUUID(),destination:'',systemIds:owner.parentId?[owner.parentId]:[]},[ownerId],{[ownerId]:link});
+  const candidates = peer[opposite].filter(candidate => candidate.itemId === entry.itemId);
+  const match = candidates.find(candidate => routePlanets(candidate).includes(ownerId))
+    ?? candidates.find(candidate => !!owner.parentId && (
+      candidate.systemIds?.includes(owner.parentId)
+      || routePlanets(candidate).some(id => sections.find(planet => planet.id === id)?.parentId === owner.parentId)
+    ));
+  if (match && !existingRate) existingRate = {amount: match.amount, unit: match.unit};
+  const link=match ? routeLinks(match)[ownerId] ?? crypto.randomUUID() : crypto.randomUUID();links[peerId]=link;
+  const mirror=match?selections({...match,systemIds:[...new Set([...(match.systemIds??[]),...(owner.parentId?[owner.parentId]:[])])]},[...new Set([...routePlanets(match),ownerId])],{...routeLinks(match),[ownerId]:link}):selections({...entry,id:crypto.randomUUID(),destination:'',systemIds:owner.parentId?[owner.parentId]:[]},[ownerId],{[ownerId]:link});
   sections=sections.map(s=>s.id===peerId?{...s,[opposite]:match?s[opposite].map(e=>e.id===match.id?mirror:e):[...s[opposite],mirror]}:s);
  }
- return {...data,sections:sections.map(s=>s.id===ownerId?{...s,[direction]:s[direction].map(e=>e.id===entryId?selections(e,routePlanets(e),links):e)}:s)};
+ const linked = {...data,sections:sections.map(s=>s.id===ownerId?{...s,[direction]:s[direction].map(e=>e.id===entryId?selections(e,routePlanets(e),links):e)}:s)};
+ // A reused row retains its established rate across the newly connected routes.
+ if (existingRate && (entry.amount !== existingRate.amount || entry.unit !== existingRate.unit)) {
+   const ownerEntries = linked.sections.find(section => section.id === ownerId)![direction];
+   return updateTrades(linked, ownerId, direction, ownerEntries.map(route => route.id === entryId ? {...route, ...existingRate} : route));
+ }
+ return linked;
 }
 export function routeReadiness(sections:DesignSection[],ownerId:string|undefined,direction:'imports'|'exports',entry:TradeEntry){
  const ids=routePlanets(entry),opposite=direction==='imports'?'exports':'imports';

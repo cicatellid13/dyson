@@ -50,3 +50,14 @@ test('to-do reordering preserves filtered-out slots and does not create undo rem
   assert.equal(removalLabel(w, after), null);
   assert.equal(reorderTodos(a.checklist, ['a','b'], 'missing', 'b'), a.checklist);
 });
+
+test('saved factory status validates and survives workspace serialization', async () => {
+  const {validateFactories} = await import('../src/lib/savedFactories');
+  const {encode, decode} = await import('../electron/backend/merge');
+  const {w,a} = fixture();
+  a.factories = {factory:{id:'factory',name:'Assembly',itemId:3,recipeId:1,facilityId:2304,beltId:2001,sorterId:2013,reach:1,mode:'infrastructure',target:60,unit:'minute',machineCount:1,oneBeltPerItem:false}};
+  assert.doesNotThrow(() => validateFactories(a.factories));
+  a.factories.factory.status = 'built';
+  assert.equal(decode(encode(w)).design.sections.find(p=>p.id===a.id)!.factories!.factory.status, 'built');
+  assert.throws(() => validateFactories({factory:{...a.factories!.factory,status:'invalid'}}));
+});
