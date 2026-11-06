@@ -138,7 +138,7 @@ function PlanetCard({ planet, items, onOpen }: { planet: DesignSection; items: M
 }
 
 export function Design({ catalog }: { catalog: Catalog }) {
-  const [notesMode, setNotesMode] = useState<'notes' | 'todo'>('notes');
+  const [todoPlanets, setTodoPlanets] = useSessionExpansion('planet-notebook-todo');
   const itemLookup = useMemo(() => new Map(catalog.items.map(item => [item.id, item])), [catalog.items]);
   const cloud = useWorkspace();
   const data = cloud.view.data.design;
@@ -156,6 +156,11 @@ export function Design({ catalog }: { catalog: Catalog }) {
   const [networkFocus]=useSessionSelection('logistics-network-focus');
   useEffect(()=>{if(!networkFocus)return;const target=JSON.parse(networkFocus) as {entryId?:string;factoryId?:string};const frame=requestAnimationFrame(()=>{const attr=target.entryId?'data-network-entry':'data-network-factory';const id=target.entryId??target.factoryId;if(!id)return;const element=Array.from(document.querySelectorAll<HTMLElement>(`[${attr}]`)).find(el=>el.getAttribute(attr)===id);element?.scrollIntoView({block:'center',behavior:'instant'});});return()=>cancelAnimationFrame(frame);},[networkFocus,activeId]);
   const active = data.sections.find(s => s.id === activeId);
+  const notesMode = activeId && todoPlanets.has(activeId) ? 'todo' : 'notes';
+  function setNotesMode(mode: 'notes' | 'todo', planetId = activeId) {
+    if (!planetId) return;
+    setTodoPlanets(previous => { const next = new Set(previous); if (mode === 'todo') next.add(planetId); else next.delete(planetId); return next; });
+  }
   const parent = data.sections.find(s => s.id === active?.parentId);
   const currentSystem = active?.kind === 'system' ? active : parent;
   const creationSystem = data.sections.find(section => section.id === creation?.parentId);
@@ -212,13 +217,13 @@ export function Design({ catalog }: { catalog: Catalog }) {
       <span>{section.kind === 'system' ? '✧' : '◉'}</span><span><strong>{section.name || 'Unnamed location'}</strong><small>{section.kind === 'system' ? `${data.sections.filter(p => p.parentId === section.id).length} planet${data.sections.filter(p => p.parentId === section.id).length === 1 ? '' : 's'}` : 'Planet'}</small></span>
       <span className="planet-sidebar-markers">
         {section.kind === 'planet' && !!section.checklist?.length && <span className="planet-todo-marker" data-tooltip="To-do" data-priority-tasks={JSON.stringify(priorityTaskSummary(section.checklist))} role="link" tabIndex={0} aria-label={`Open ${section.name} to-do`}
-          onClick={event => { event.stopPropagation(); navigate(section.id); setNotesMode('todo'); }}
+          onClick={event => { event.stopPropagation(); navigate(section.id); setNotesMode('todo', section.id); }}
           onKeyDown={event => {
             if (event.key === 'Enter' || event.key === ' ') {
               event.preventDefault();
               event.stopPropagation();
               navigate(section.id);
-              setNotesMode('todo');
+              setNotesMode('todo', section.id);
             }
           }}><PlanetTodoIcon/></span>}
         {priorityNames.length > 0 && <span className="priority-marker" data-tooltip={section.kind === 'system' ? priorityNames.join('\n') : 'Priority'} aria-label={`Priority planets: ${priorityNames.join(', ')}`}><PriorityFlag/></span>}
@@ -244,7 +249,7 @@ export function Design({ catalog }: { catalog: Catalog }) {
         {active.kind === 'planet' && <Specializations label="Planet type" single tags={active.planetType?[active.planetType]:[]} choices={labelChoices('planetTypes')} onChange={tags=>patch({planetType:tags[0]??''})} onRemember={tag=>rememberLabel('planetTypes',tag)}/>}
         {active.kind === 'planet' && <Specializations tags={active.specializations??[]} choices={labelChoices('specializationTypes')} onChange={specializations=>patch({specializations})} onRemember={tag=>rememberLabel('specializationTypes',tag)}/>}
         {active.kind === 'planet' && !parent && <div className="design-assignment"><label>Assign to a system<ThemedSelect aria-label="Assign planet to system" value="" onChange={event => { if (roots.some(system => system.id === event.target.value)) patch({parentId: event.target.value}); }}><option value="">Select a system</option>{roots.map(system => <option key={system.id} value={system.id}>{system.name}</option>)}</ThemedSelect></label>{!roots.length && <p className="design-empty-small">Create a system using + System, then assign this planet here. Your notes and routes are preserved.</p>}</div>}
-        <div className="location-notebook">{active.kind==='planet'?<div className="catalog-view-controls"><div role="group" aria-label="Notes or to-do"><button aria-pressed={notesMode==='notes'} onClick={()=>setNotesMode('notes')}>Notes</button><button aria-pressed={notesMode==='todo'} onClick={()=>setNotesMode('todo')}>To-do</button></div></div>:<h3>Notes</h3>}{active.kind==='system'||notesMode==='notes'?<label className="design-notes"><AutoTextarea aria-label="Section notes" placeholder="Resources, production goals, construction plans…" value={active.notes} onChange={e => patch({notes: e.target.value})}/></label>:<NoteChecklist key={active.id} entries={active.checklist??[]} onChange={checklist=>patch({checklist})}/>}</div>
+        <div className="location-notebook">{active.kind==='planet'?<div className="catalog-view-controls"><div role="group" aria-label="Notes or to-do"><button aria-pressed={notesMode==='notes'} onClick={()=>setNotesMode('notes')}>Notes</button><button aria-pressed={notesMode==='todo'} onClick={()=>setNotesMode('todo')}>To-do</button></div></div>:<h3>Notes</h3>}{active.kind==='system'||notesMode==='notes'?<label className="design-notes"><AutoTextarea aria-label="Section notes" placeholder="Resources, production goals, construction plans…" value={active.notes} onChange={e => patch({notes: e.target.value})}/></label>:<NoteChecklist catalog={catalog} key={active.id} entries={active.checklist??[]} onChange={checklist=>patch({checklist})}/>}</div>
         {active.kind === 'system' && <section className="design-planets"><div className="design-section-heading"><h3>Planets in this system</h3><button className="design-button" onClick={() => begin('planet', active.id)}>+ Add planet</button></div>{creation?.kind === 'planet' && creation.placement === 'inline' && creation.parentId === active.id && <form className="design-create-form design-inline-create" onSubmit={add}><h3>Add planet to {active.name}</h3><label>Planet name<input autoFocus aria-label="New planet name" value={name} maxLength={120} placeholder="e.g. Homeworld" onChange={event => setName(event.target.value)}/></label><div><button className="design-button" type="submit" disabled={!name.trim()}>Create planet</button><button type="button" onClick={() => setCreation(null)}>Cancel</button></div></form>}<div className="design-planet-cards">{children.map(child => <PlanetCard key={`${child.id}-${catalog.items.length}`} planet={child} items={itemLookup} onOpen={() => navigate(child.id)}/>)}</div>{!children.length && <p className="design-empty-small">Add a planet to start mapping this system.</p>}</section>}
         {active.kind==='planet'&&<PlanetFactories key={active.id} planet={active} catalog={catalog}/>}
         {active.kind==='planet'&&<div className="design-trade-grid"><TradeList currentPlanetId={active.kind==='planet'?active.id:undefined} collapsible={active.kind==='planet'} key={`imports-${catalog.items.length}`} direction="imports" entries={active.imports} items={catalog.items} sections={data.sections} onChange={imports => updateWorkspace(current=>({...current,design:updateTrades(current.design,active.id,'imports',imports)}))}/><TradeList currentPlanetId={active.kind==='planet'?active.id:undefined} collapsible={active.kind==='planet'} key={`exports-${catalog.items.length}`} direction="exports" entries={active.exports} items={catalog.items} sections={data.sections} onChange={exports => updateWorkspace(current=>({...current,design:updateTrades(current.design,active.id,'exports',exports)}))}/></div>}

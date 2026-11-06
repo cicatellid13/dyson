@@ -61,3 +61,20 @@ test('saved factory status validates and survives workspace serialization', asyn
   assert.equal(decode(encode(w)).design.sections.find(p=>p.id===a.id)!.factories!.factory.status, 'built');
   assert.throws(() => validateFactories({factory:{...a.factories!.factory,status:'invalid'}}));
 });
+
+test('task item links survive database encoding and deletion undo', async()=>{
+ const {encode,decode}=await import('../electron/backend/merge');
+ const {w,a}=fixture();
+ a.checklist=[{id:'linked-task',text:'Build components',done:false,type:'production',itemIds:[1101,1102]}];
+ const restored=decode(encode(w));
+ assert.deepEqual(restored.design.sections.find(p=>p.id===a.id)!.checklist![0].itemIds,[1101,1102]);
+ const after=structuredClone(w);after.design.sections.find(p=>p.id===a.id)!.checklist=[];
+ assert.deepEqual(restoreRemoval(w,after,after).design.sections.find(p=>p.id===a.id)!.checklist,a.checklist);
+});
+test('task item links reject duplicate and invalid IDs while legacy tasks remain valid',async()=>{
+ const {validatePlanning}=await import('../src/lib/planning');
+ const validate=(itemIds?:unknown)=>validatePlanning({folders:[],notes:[{id:'note',folderId:null,title:'',body:'',checklist:[{id:'task',text:'',done:false,...(itemIds===undefined?{}:{itemIds})}]}]});
+ assert.doesNotThrow(()=>validate());
+ assert.doesNotThrow(()=>validate([1101,1102]));
+ for(const ids of [[1,1],[-1],[1.5],['1'],null]) assert.throws(()=>validate(ids));
+});
