@@ -62,8 +62,8 @@ export function RecipePreview({ catalog }: { catalog: Catalog }) {
         show(target, true);
       } else {
         setPreview(null);
-        // Empty space in an item button does not activate the preview or item.
-        if (event.detail !== 0 && event.target instanceof Element && event.target.closest('[data-preview-id]') && !event.target.closest('strong, .preview-name')) {
+        // Catalog rows allow whole-row navigation; other item surfaces keep icon/name-only interactions.
+        if (event.detail !== 0 && event.target instanceof Element && event.target.closest('[data-preview-id]') && !event.target.closest('.item-row') && !event.target.closest('strong, .preview-name')) {
           event.preventDefault();
           event.stopPropagation();
         }
