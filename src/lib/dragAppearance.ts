@@ -14,8 +14,10 @@ export function useDelayedDragCursor() {
     let held: Element | null = null;
     function clear() {
       clearTimeout(timer);
+      timer = undefined;
       held?.classList.remove('drag-held');
       held = null;
+      document.querySelectorAll('.drag-held').forEach(element => element.classList.remove('drag-held'));
     }
     function down(event: PointerEvent) {
       clear();
@@ -23,10 +25,15 @@ export function useDelayedDragCursor() {
       const target = event.target.closest('[draggable="true"]');
       if (!target || event.target.closest('input,textarea,[contenteditable="true"]')) return;
       held = target;
-      timer = setTimeout(() => { if (target.isConnected) target.classList.add('drag-held'); }, 250);
+      timer = setTimeout(() => { if (held === target && target.isConnected) target.classList.add('drag-held'); }, 250);
     }
     document.addEventListener('pointerdown', down, true);
-    const events = ['pointerup', 'pointercancel', 'dragstart', 'dragend'];
+    // Native dragging can consume pointerup, or remove the source before dragend.
+    const events = ['pointerup', 'mouseup', 'pointercancel', 'dragstart', 'dragend', 'drop', 'visibilitychange'];
+    function move(event: PointerEvent) { if (!(event.buttons & 1)) clear(); }
+    function key(event: KeyboardEvent) { if (event.key === 'Escape') clear(); }
+    document.addEventListener('pointermove', move, true);
+    document.addEventListener('keydown', key, true);
     events.forEach(type => document.addEventListener(type, clear, true));
     window.addEventListener('blur', clear);
     return () => {
@@ -34,6 +41,8 @@ export function useDelayedDragCursor() {
       document.removeEventListener('pointerdown', down, true);
       events.forEach(type => document.removeEventListener(type, clear, true));
       window.removeEventListener('blur', clear);
+      document.removeEventListener('pointermove', move, true);
+      document.removeEventListener('keydown', key, true);
     };
   }, []);
 }

@@ -29,3 +29,8 @@
 .todo-drag-handle{display:grid;place-items:center;flex-shrink:0;width:26px;height:28px;padding:0;color:#94aaa0;border-radius:5px;background:transparent}
 .todo-drag-handle:hover{background:#294238;color:#c2dfcf}
 .checklist-row.todo-drop-target{outline:1px solid #9bd5ae;outline-offset:2px;border-radius:5px;background:#20392f}
+
+/* Keep text-field padding and click focus outlines off native task checkboxes. */
+.design-workspace .checklist-row input[type=checkbox]{width:16px;height:16px;flex:0 0 16px;margin:0;padding:0;border:0;border-radius:3px;background:transparent;accent-color:#8ed6b4;box-shadow:none}
+.design-workspace .checklist-row input[type=checkbox]:focus{outline:none}
+.design-workspace .checklist-row input[type=checkbox]:focus-visible{outline:2px solid #9bd5ae;outline-offset:3px}
