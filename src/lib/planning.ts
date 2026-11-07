@@ -1,7 +1,7 @@
 export type PlanningFolder = { id: string; name: string; order?: number };
 export const todoTypes = ['import','export','production','power','issue','other'] as const;
 export type TodoType = typeof todoTypes[number];
-export type ChecklistItem = { itemIds?: number[]; type?:TodoType; id:string; text:string; done:boolean };
+export type ChecklistItem = { requiredInputs?: Record<string,number>; itemIds?: number[]; type?:TodoType; id:string; text:string; done:boolean };
 export type PlanningNote = { checklist?: ChecklistItem[]; id: string; folderId: string | null; title: string; body: string; order?: number };
 export type PlanningData = { folders: PlanningFolder[]; notes: PlanningNote[] };
 export const emptyPlanning = (): PlanningData => ({ folders: [], notes: [] });
@@ -22,6 +22,9 @@ export function validatePlanning(input: unknown): PlanningData {
   for (const note of value.notes) {
     if (!note || !validRecordId(note.id) || noteIds.has(note.id) || typeof note.title !== 'string' || note.title.length > 120 || typeof note.body !== 'string' || (note.folderId !== null && !folderIds.has(note.folderId))) throw Error('Invalid planning note.');
     if (note.order !== undefined && !Number.isFinite(note.order)) throw Error('Invalid note order.');
+    for (const task of Array.isArray(note.checklist) ? note.checklist : []) {
+      if (task?.requiredInputs !== undefined && (!task.requiredInputs || typeof task.requiredInputs !== 'object' || Array.isArray(task.requiredInputs) || Object.keys(task.requiredInputs).length > 500 || Object.entries(task.requiredInputs).some(([id,parent]) => !Number.isSafeInteger(Number(id)) || Number(id)<=0 || !Number.isSafeInteger(parent) || Number(parent)<=0 || Number(id)===parent || !task.itemIds?.includes(Number(id)) || !task.itemIds?.includes(Number(parent))))) throw Error('Invalid task input links.');
+    }
     if(note.checklist !== undefined && (!Array.isArray(note.checklist)||note.checklist.length>1000||new Set(note.checklist.map(t=>t.id)).size!==note.checklist.length||note.checklist.some(t=>!t||!validRecordId(t.id)||typeof t.text!=='string'||t.text.length>1000||typeof t.done!=='boolean'||(t.type!==undefined&&!todoTypes.includes(t.type))||(t.itemIds!==undefined&&(!Array.isArray(t.itemIds)||t.itemIds.length>500||new Set(t.itemIds).size!==t.itemIds.length||t.itemIds.some(id=>!Number.isSafeInteger(id)||id<=0)))))) throw Error('Invalid checklist.');
     noteIds.add(note.id);
   }

@@ -69,9 +69,9 @@ export function App(){
 
  const [query,setQuery]=useState('');
  const [favoriteSearch,setFavoriteSearch]=useState('');
- const [,setLocation]=useSessionSelection('logistics-location');const [,setGraph]=useSessionSelection('logistics-graph');const [,setSystemsExpanded]=useSessionExpansion('logistics-systems');
+ const [,setTodoOverview]=useSessionSelection('network-todo-overview');const [,setLocation]=useSessionSelection('logistics-location');const [,setGraph]=useSessionSelection('logistics-graph');const [,setSystemsExpanded]=useSessionExpansion('logistics-systems');
  const [networkRequest,setNetworkRequest]=useState<NetworkRequest|null>(null);const [,setEntriesExpanded]=useSessionExpansion('logistics-entries');const [,setFactoryPlanet]=useSessionSelection('logistics-factory-planet');const [,setFactoryFocus]=useSessionSelection('logistics-factory-focus');const [,setNetworkFocus]=useSessionSelection('logistics-network-focus');
- function openPlanet(id:string,entryId?:string,factoryId?:string){const planet=cloud.view.data.design.sections.find(s=>s.id===id&&s.kind==='planet');if(!planet)return;setLocation(id);setGraph(null);setNetworkFocus(JSON.stringify({entryId,factoryId,nonce:crypto.randomUUID()}));if(entryId)setEntriesExpanded(old=>new Set([...old,entryId]));if(factoryId){setFactoryPlanet(id);setFactoryFocus(factoryId);}if(planet.parentId)setSystemsExpanded(old=>new Set([...old,planet.parentId!]));selectCategory('Logistics Network');}
+ function openPlanet(id:string,entryId?:string,factoryId?:string){const planet=cloud.view.data.design.sections.find(s=>s.id===id&&s.kind==='planet');if(!planet)return;setTodoOverview(null);setLocation(id);setGraph(null);setNetworkFocus(JSON.stringify({entryId,factoryId,nonce:crypto.randomUUID()}));if(entryId)setEntriesExpanded(old=>new Set([...old,entryId]));if(factoryId){setFactoryPlanet(id);setFactoryFocus(factoryId);}if(planet.parentId)setSystemsExpanded(old=>new Set([...old,planet.parentId!]));selectCategory('Logistics Network');}
  const [plannerRequest,setPlannerRequest]=useState<{id:number;sequence:number;saved?:SavedFactory;planetId?:string}>();
  function planItem(id:number,saved?:SavedFactory,planetId?:string){setPlannerRequest(previous=>({id,saved,planetId,sequence:(previous?.sequence??0)+1}));setCategory('Factory Planner');}
  const [draggedItem,setDraggedItem]=useState<number|null>(null);

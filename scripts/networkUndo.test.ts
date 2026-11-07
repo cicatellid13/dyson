@@ -115,3 +115,17 @@ test('rejected drag start and failed drop both clean up once',async()=>{
  const failed=createPointerDragSession({x:0,y:0},{start:()=>true,over:()=>true,drop:()=>{throw Error('drop failed');},end:()=>{ends++;}});
  failed.move({x:10,y:0});assert.throws(()=>failed.release({x:20,y:0}));failed.cancel();assert.equal(ends,2);
 });
+
+test('removing a main task item removes its attached inputs but preserves unrelated items',async()=>{
+ const {taskItemAttachment,removeTaskItem}=await import('../src/lib/taskItemLinks');
+ const catalog={items:[1,2,3].map(id=>({id})),recipes:[{id:1,inputs:[2,2,3,1],outputs:[1,1]}]} as Catalog;
+ const linked=taskItemAttachment(catalog,{},1,true);
+ assert.deepEqual(linked,{itemIds:[1,2,3],requiredInputs:{2:1,3:1}});
+ assert.deepEqual(taskItemAttachment(catalog,{itemIds:[2]},1,true).requiredInputs,{3:1});
+ assert.deepEqual(taskItemAttachment(catalog,linked,2,false).requiredInputs,{3:1});
+ assert.deepEqual(removeTaskItem(linked,1),{itemIds:[],requiredInputs:{}});
+ assert.deepEqual(removeTaskItem(linked,1,false),{itemIds:[2,3],requiredInputs:{}});
+ assert.deepEqual(removeTaskItem({...linked,itemIds:[1,2,3,4,5],requiredInputs:{...linked.requiredInputs,5:4}},1),{itemIds:[4,5],requiredInputs:{5:4}});
+ assert.deepEqual(removeTaskItem(taskItemAttachment(catalog,{itemIds:[2]},1,true),1),{itemIds:[2],requiredInputs:{}});
+ assert.deepEqual(removeTaskItem(linked,2).requiredInputs,{3:1});
+});
