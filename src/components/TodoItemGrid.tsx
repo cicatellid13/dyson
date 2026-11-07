@@ -20,7 +20,7 @@ export function TodoItemGrid({ items, onLink }: { items: Item[]; onLink: (taskId
     let moved=false;
     let target:HTMLElement|null=null;
     function cleanup() {
-      document.documentElement.classList.remove('task-item-dragging');
+      document.documentElement.classList.remove('task-item-dragging', 'task-grid-dragging');
       target?.classList.remove('todo-drop-target');
       window.removeEventListener('pointermove',move,true);
       window.removeEventListener('pointerup',up,true);
@@ -32,7 +32,7 @@ export function TodoItemGrid({ items, onLink }: { items: Item[]; onLink: (taskId
     }
     function move(e:PointerEvent) {
       if(!moved && Math.hypot(e.clientX-origin.x,e.clientY-origin.y)<6)return;
-      document.documentElement.classList.add('task-item-dragging');
+      document.documentElement.classList.add('task-item-dragging', 'task-grid-dragging');
       moved=true;draggingRef.current=true;suppressClick.current=true;setDragging(true);
       setGhost({id,x:e.clientX,y:e.clientY});
       target?.classList.remove('todo-drop-target');
