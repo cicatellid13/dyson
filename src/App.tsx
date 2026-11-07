@@ -64,7 +64,7 @@ function ExpandableInput({ catalog, itemMap, id, count, path, onItemDrag }: {
 }
 
 export function App(){
- useDelayedDragCursor();
+ useDelayedDragCursor(() => setDraggedItem(null));
 
 
  const [query,setQuery]=useState('');

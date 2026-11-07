@@ -4,7 +4,8 @@ import type { Item } from '../lib/catalog';
 import { CatalogGrid } from './CatalogGrid';
 import { useItemAccess } from './ItemAccess';
 
-export function TodoItemGrid({ items, onLink }: { items: Item[]; onLink: (taskId: string, itemId: number) => void }) {
+export function TodoItemGrid({ items, onLink }: { items: Item[]; onLink: (taskId: string, itemId: number, includeInputs: boolean) => void }) {
+  const [includeInputs, setIncludeInputs] = useState(false);
   const linkRef = useRef(onLink);
   linkRef.current = onLink;
   const [ghost, setGhost] = useState<{id:number;x:number;y:number}|null>(null);
@@ -19,6 +20,7 @@ export function TodoItemGrid({ items, onLink }: { items: Item[]; onLink: (taskId
     let moved=false;
     let target:HTMLElement|null=null;
     function cleanup() {
+      document.documentElement.classList.remove('task-item-dragging');
       target?.classList.remove('todo-drop-target');
       window.removeEventListener('pointermove',move,true);
       window.removeEventListener('pointerup',up,true);
@@ -30,6 +32,7 @@ export function TodoItemGrid({ items, onLink }: { items: Item[]; onLink: (taskId
     }
     function move(e:PointerEvent) {
       if(!moved && Math.hypot(e.clientX-origin.x,e.clientY-origin.y)<6)return;
+      document.documentElement.classList.add('task-item-dragging');
       moved=true;draggingRef.current=true;suppressClick.current=true;setDragging(true);
       setGhost({id,x:e.clientX,y:e.clientY});
       target?.classList.remove('todo-drop-target');
@@ -37,7 +40,7 @@ export function TodoItemGrid({ items, onLink }: { items: Item[]; onLink: (taskId
       target?.classList.add('todo-drop-target');
     }
     function up(e:PointerEvent) {
-      if(moved){e.preventDefault();e.stopPropagation();const row=document.elementFromPoint(e.clientX,e.clientY)?.closest<HTMLElement>('[data-todo-id]');if(row?.dataset.todoId)linkRef.current(row.dataset.todoId,id);setOpen(false);}
+      if(moved){e.preventDefault();e.stopPropagation();const row=document.elementFromPoint(e.clientX,e.clientY)?.closest<HTMLElement>('[data-todo-id]');if(row?.dataset.todoId)linkRef.current(row.dataset.todoId,id,includeInputs);setOpen(false);}
       cleanup();
     }
     function cancel(){cleanup();}
@@ -46,6 +49,7 @@ export function TodoItemGrid({ items, onLink }: { items: Item[]; onLink: (taskId
     window.addEventListener('pointermove',move,true);window.addEventListener('pointerup',up,true);window.addEventListener('pointercancel',cancel,true);window.addEventListener('blur',cancel);document.addEventListener('keydown',key,true);
   }
   const [open, setOpen] = useState(false);
+  useEffect(() => { if (!open) setIncludeInputs(false); }, [open]);
   const [dragging, setDragging] = useState(false);
   const draggingRef = useRef(false);
   const hideFrame = useRef<number>();
@@ -91,6 +95,6 @@ export function TodoItemGrid({ items, onLink }: { items: Item[]; onLink: (taskId
   }, [open]);
   return <><button ref={trigger} type="button" className="todo-grid-toggle" aria-label="Open item grid" data-tooltip="Item grid" aria-expanded={open} onClick={() => setOpen(value => !value)}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">{[3,10,17].flatMap(x => [3,10,17].map(y => <rect key={`${x}-${y}`} x={x} y={y} width="4" height="4" rx=".6"/>))}</svg></button>{open && createPortal(<div ref={panel} className="todo-item-grid" role="dialog" aria-label="Link items to tasks" style={{opacity: dragging ? 0 : 1, pointerEvents: dragging ? 'none' : 'auto'}} onDragStartCapture={() => { draggingRef.current = true; }} onDragLeave={event => { if (draggingRef.current && !event.currentTarget.contains(event.relatedTarget as Node | null)) hideFrame.current = requestAnimationFrame(() => setDragging(true)); }}>
     <header><span>Drag items onto a task</span><button type="button" aria-label="Close item grid" onClick={() => setOpen(false)}>×</button></header>
-    <CatalogGrid items={items} onItemPointerDown={startPointer} onSelect={id => { if(suppressClick.current){suppressClick.current=false;return;} setOpen(false); actions.navigate(id); }}/>
-  </div>, document.body)}{ghost && createPortal(<div className="todo-drag-ghost" style={{left:ghost.x+10,top:ghost.y+10}}><img src={`${import.meta.env.BASE_URL}${items.find(item=>item.id===ghost.id)?.icon}`} alt=""/></div>,document.body)}</>;
+    <CatalogGrid items={items} headerAddon={<label className="todo-grid-inputs"><input type="checkbox" checked={includeInputs} onChange={event=>setIncludeInputs(event.target.checked)}/>Include required inputs</label>} onItemPointerDown={startPointer} onSelect={id => { if(suppressClick.current){suppressClick.current=false;return;} setOpen(false); actions.navigate(id); }}/>
+  </div>, document.body)}{ghost && createPortal(<div className="todo-drag-ghost" style={{left:ghost.x-12,top:ghost.y-10}}><img src={`${import.meta.env.BASE_URL}${items.find(item=>item.id===ghost.id)?.icon}`} alt=""/></div>,document.body)}</>;
 }

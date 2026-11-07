@@ -78,3 +78,40 @@ test('task item links reject duplicate and invalid IDs while legacy tasks remain
  assert.doesNotThrow(()=>validate([1101,1102]));
  for(const ids of [[1,1],[-1],[1.5],['1'],null]) assert.throws(()=>validate(ids));
 });
+
+test('task item drop optionally adds only direct default-recipe inputs without duplicates',async()=>{
+ const {taskItemLinks}=await import('../src/lib/taskItemLinks');
+ const catalog={items:[1,2,3,4,5].map(id=>({id})),recipes:[{id:2,inputs:[5,1],outputs:[1,1]},{id:1,inputs:[2,2,3,1,99,1],outputs:[1,1]},{id:3,inputs:[4,1],outputs:[2,1]}]} as Catalog;
+ assert.deepEqual(taskItemLinks(catalog,[],1,false),[1]);
+ assert.deepEqual(taskItemLinks(catalog,[3],1,true),[3,1,2]);
+ assert.deepEqual(taskItemLinks(catalog,[1,2,3],1,true),[1,2,3]);
+ assert.deepEqual(taskItemLinks(catalog,[],4,true),[4]);
+ assert.deepEqual(taskItemLinks(catalog,[1],99,true),[1]);
+});
+
+test('pointer drag leaves quick clicks alone and starts once after the threshold',async()=>{
+ const {createPointerDragSession}=await import('../src/lib/pointerDragSession');
+ const events:string[]=[];
+ const callbacks={start:()=>{events.push('start');return true;},over:()=>{events.push('over');return true;},drop:()=>{events.push('drop');},end:(dropped:boolean)=>{events.push(`end:${dropped}`);}};
+ const click=createPointerDragSession({x:0,y:0},callbacks);
+ click.move({x:2,y:2});assert.equal(click.release({x:2,y:2}),false);assert.deepEqual(events,[]);
+ const drag=createPointerDragSession({x:0,y:0},callbacks);
+ drag.move({x:7,y:0});drag.move({x:20,y:0});assert.equal(drag.release({x:30,y:0}),true);
+ assert.equal(events.filter(e=>e==='start').length,1);assert.equal(events.filter(e=>e==='drop').length,1);assert.equal(events.at(-1),'end:true');
+ drag.cancel();drag.release({x:40,y:0});assert.equal(events.filter(e=>e.startsWith('end:')).length,1);
+});
+test('pointer drag revalidates the actual release target and cancels without mutations',async()=>{
+ const {createPointerDragSession}=await import('../src/lib/pointerDragSession');
+ let drops=0,ends=0;
+ const callbacks={start:()=>true,over:(p:{x:number;y:number})=>p.x<50,drop:()=>{drops++;},end:()=>{ends++;}};
+ const drag=createPointerDragSession({x:0,y:0},callbacks);drag.move({x:10,y:0});drag.release({x:100,y:0});assert.equal(drops,0);assert.equal(ends,1);
+ const cancelled=createPointerDragSession({x:0,y:0},callbacks);cancelled.move({x:10,y:0});cancelled.cancel();cancelled.release({x:20,y:0});assert.equal(drops,0);assert.equal(ends,2);
+});
+test('rejected drag start and failed drop both clean up once',async()=>{
+ const {createPointerDragSession}=await import('../src/lib/pointerDragSession');
+ let ends=0;
+ const rejected=createPointerDragSession({x:0,y:0},{start:()=>false,over:()=>{throw Error('must not visit');},drop:()=>{},end:()=>{ends++;}});
+ rejected.move({x:10,y:0});rejected.cancel();assert.equal(ends,1);
+ const failed=createPointerDragSession({x:0,y:0},{start:()=>true,over:()=>true,drop:()=>{throw Error('drop failed');},end:()=>{ends++;}});
+ failed.move({x:10,y:0});assert.throws(()=>failed.release({x:20,y:0}));failed.cancel();assert.equal(ends,2);
+});
