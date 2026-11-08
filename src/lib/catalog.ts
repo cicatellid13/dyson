@@ -1,4 +1,17 @@
-export type Item = { id:number; name:string; type:string; grid_index?:number; description:string; overview?: {text:string; itemId?:number; bold?:boolean}[][]; overviewSource?:string; icon:string|null; stack_size:number; can_build?:boolean; mining_from?:string; explicit_produce_from?:string; energy?:number };
+export type OverviewSegment = {text:string; itemId?:number; bold?:boolean};
+export type WikiReference = {source:string; checked:string};
+export type Item = { id:number; name:string; type:string; grid_index?:number; description:string; overview?: OverviewSegment[][]; overviewSource?:string; supplementalOverview?: OverviewSegment[][]; supplementReference?:WikiReference; buildingDetails?:WikiReference & {fields:{label:string;value:string}[]}; requires_dark_fog?:boolean; icon:string|null; stack_size:number; can_build?:boolean; mining_from?:string; explicit_produce_from?:string; energy?:number };
+
+/** Keep the in-game description first, without losing linked wiki paragraphs. */
+export function overviewParagraphs(item:Item):OverviewSegment[][] {
+  const normalize=(text:string)=>text.replace(/\s+/g,' ').trim().toLowerCase();
+  const seen=new Set<string>();
+  return [...(item.description.trim()?[[{text:item.description}]]:[]),...(item.overview??[]),...(item.supplementalOverview??[])].filter(paragraph=>{
+    const text=normalize(paragraph.map(segment=>segment.text).join(''));
+    if(!text||seen.has(text))return false;
+    seen.add(text);return true;
+  });
+}
 export type Recipe = {id:number; name:string; type:string; inputs:number[]; outputs:number[]; seconds:number; handcraft?:boolean; explicit?:boolean; description?:string};
 export type Catalog = {items:Item[]; recipes:Recipe[]; facilities:Record<string,{name:string; buildings:number[]}>; techs:{id:number;name:string;recipes?:number[]}[]; categories:Record<string,string>; downloaded:string; sourceUpdated:string; source:string; revision:number};
 export const pairs = (values:number[]) => Array.from({length:values.length/2},(_,i)=>({id:values[i*2],count:values[i*2+1]}));
@@ -18,7 +31,7 @@ export function isDefenseItem(item?: Item): boolean {
 /** A view of the snapshot; saved favorites and logistics data remain untouched. */
 export function catalogForDarkFog(source: Catalog, enabled: boolean): Catalog {
   if (enabled) return source;
-  const items = source.items.filter(item => !isDefenseItem(item) && item.type !== 'DARK_FOG');
+  const items = source.items.filter(item => !isDefenseItem(item) && item.type !== 'DARK_FOG' && !item.requires_dark_fog);
   const ids = new Set(items.map(item => item.id));
   return {
     ...source, items,

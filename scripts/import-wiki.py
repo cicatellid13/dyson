@@ -88,3 +88,4 @@ def main():
 if __name__=='__main__':
     main()
     subprocess.run(['python3', str(ROOT/'scripts/import-overviews.py')], check=True)
+    subprocess.run(['python3', str(ROOT/'scripts/apply-wiki-supplement.py')], check=True)

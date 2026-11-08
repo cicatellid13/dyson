@@ -82,14 +82,18 @@ Changes save locally and synchronize after a 750 ms pause. Revision checks prote
 
 ## Wiki data and calculation limits
 
-The bundled reference data comes from [DSP Wiki](https://dyson-sphere-program.fandom.com/wiki/Dyson_Sphere_Program_Wiki), including its recipe data and item overviews. Item links open their corresponding wiki page. To refresh local reference data deliberately:
+The base reference data comes from the [Fandom DSP Wiki](https://dyson-sphere-program.fandom.com/wiki/Dyson_Sphere_Program_Wiki), including recipe data and item overviews. Reviewed additions from [DSP Wiki (dsp-wiki.com)](https://dsp-wiki.com/Items) supplement this snapshot with building specifications, logistics guidance, proliferation reference facts, the missing Crystal Explosive Unit overview, and Holo Beacon / Dark Fog Lens items and recipes. New item and recipe IDs come from the wiki's [game dataset](https://dsp-wiki.com/Module:GameData/protosets.json), version 0.10.35.29104. This is a supplemental snapshot, not a claim that every existing recipe has been refreshed to that version.
+
+In-game descriptions appear first in every item overview. Buildings with verified specifications have a building-details button containing available footprint, speed, power and capacity facts, with a source link. Missing fields are omitted. Item overviews retain their existing text and linked references, with sources for additions. These reference additions do not change Factory Planner calculations.
+
+To refresh local reference data deliberately:
 
 ```sh
 npm run data:refresh
 npm test
 ```
 
-The importer requires Python 3 and curl, parses declarative Lua without executing it, and caches images. Rebuild to distribute refreshed assets. Updating the bundled snapshot alone does not overwrite the shared MongoDB catalog; that requires an explicit backend catalog migration.
+The importer requires Python 3 and curl, parses declarative Lua without executing it, and caches images. After importing Fandom data and overviews, it reapplies the reviewed additions in `scripts/data/dsp-wiki-supplement.json` using `scripts/apply-wiki-supplement.py`; this step needs no network access. It preserves upstream definitions of supplemental recipes and technologies if a future base import already includes them. Review and update the supplement deliberately when the wiki changes; it is not scraped at app startup. Rebuild to distribute refreshed assets. A newer bundled snapshot advances the local reference cache and, when reachable, the shared MongoDB catalog without replacing workspace data. Older snapshots cannot downgrade it.
 
 Recipe-reference quantities use whole crafting batches; fractionation displays expected yields. Expandable reference chains use the first listed ingredient recipe, stop at cycles/depth limits, and do not reuse byproducts across branches.
 
@@ -100,3 +104,5 @@ Specifications and implementation notes are in [docs/SPEC.md](docs/SPEC.md).
 ## Attribution
 
 Wiki text and data © DSP Wiki contributors under the applicable [Fandom content license](https://www.fandom.com/licensing). Game names and artwork belong to their rights holders, Youthcat Studio / Gamera Games. DSP Toolkit is an unofficial companion app.
+
+Supplemental material from [dsp-wiki.com contributors](https://dsp-wiki.com/) is available under [Creative Commons Attribution-ShareAlike 4.0](https://creativecommons.org/licenses/by-sa/4.0/), unless otherwise noted on the source page. We extracted and relabeled specification fields, adapted summaries into shorter guidance, resolved item references, and converted selected item/recipe records for this catalog. These adaptations remain under CC BY-SA 4.0; the app's code license does not replace third-party content licenses. Exact source URLs and retrieval dates are retained in the [reviewed supplement](scripts/data/dsp-wiki-supplement.json) and bundled catalog. The new item icons depict game artwork and remain subject to their rights holders.

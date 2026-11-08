@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import ts from 'typescript';
 const compiled=ts.transpileModule(readFileSync(new URL('../src/lib/catalog.ts',import.meta.url),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;
-const {pairs,recipesFor,batchesFor,catalogForDarkFog,isDefenseItem}=await import('data:text/javascript;base64,'+Buffer.from(compiled).toString('base64'));
+const {pairs,recipesFor,batchesFor,catalogForDarkFog,isDefenseItem,overviewParagraphs}=await import('data:text/javascript;base64,'+Buffer.from(compiled).toString('base64'));
 const c=JSON.parse(readFileSync(new URL('../public/data/catalog.json',import.meta.url),'utf8'));
 const ids=new Set(c.items.map(i=>i.id));
 test('all enabled items have a bundled image with a valid file signature',()=>{
@@ -45,4 +45,44 @@ test('cached Overviews preserve paragraphs and resolve aliases to valid local it
  for(const item of c.items)for(const paragraph of item.overview??[])for(const segment of paragraph){
   assert.equal(typeof segment.text,'string');if(segment.itemId)assert.ok(ids.has(segment.itemId));
  }
+});
+
+test('item overviews start with the in-game description and retain linked reference text',()=>{
+ for(const item of c.items){
+  const paragraphs=overviewParagraphs(item);
+  assert.equal(paragraphs[0].map(s=>s.text).join(''),item.description,item.name);
+  for(const paragraph of [...item.overview??[],...item.supplementalOverview??[]]){
+   const text=paragraph.map(s=>s.text).join('').replace(/\s+/g,' ').trim().toLowerCase();
+   assert.ok(paragraphs.some(p=>p.map(s=>s.text).join('').replace(/\s+/g,' ').trim().toLowerCase()===text),item.name);
+   for(const segment of paragraph)if(segment.itemId)assert.ok(ids.has(segment.itemId),item.name);
+  }
+ }
+ assert.equal(overviewParagraphs({description:'Same description.',overview:[[{text:' Same  description. '}]]}).length,1);
+ assert.equal(overviewParagraphs({description:'Description only.'}).length,1);
+});
+
+test('wiki additions retain valid sources, grid positions, recipe IDs and Dark Fog visibility',()=>{
+ const positions=new Set();
+ for(const item of c.items){
+  assert.ok(!positions.has(item.grid_index),`Duplicate grid cell: ${item.name}`);positions.add(item.grid_index);
+  if(item.buildingDetails){
+   assert.ok(item.can_build,item.name);
+   assert.ok(item.buildingDetails.source.startsWith('https://dsp-wiki.com/'));
+   assert.ok(Number.isFinite(Date.parse(item.buildingDetails.checked)));
+   assert.equal(new Set(item.buildingDetails.fields.map(f=>f.label)).size,item.buildingDetails.fields.length);
+   for(const field of item.buildingDetails.fields)assert.ok(field.label&&field.value,item.name);
+  }
+ }
+ assert.equal(new Set(c.recipes.map(r=>r.id)).size,c.recipes.length);
+ assert.equal(new Set(c.techs.map(t=>t.id)).size,c.techs.length);
+ const plane=c.items.find(i=>i.id===2315);
+ assert.equal(plane.buildingDetails.fields.find(f=>f.label==='Operating power').value,'1.44 MW');
+ assert.equal(plane.buildingDetails.fields.find(f=>f.label==='Footprint').value,'3×3');
+ assert.deepEqual(recipesFor(c,2401)[0].inputs,[1101,3,1111,4,1401,2,1301,2]);
+ assert.equal(recipesFor(c,2401)[0].seconds,4);
+ assert.deepEqual(recipesFor(c,1211)[0].inputs,[1209,1,5201,12]);
+ assert.ok(catalogForDarkFog(c,false).items.some(i=>i.id===2401));
+ assert.ok(!catalogForDarkFog(c,false).items.some(i=>i.id===1211));
+ assert.ok(c.items.find(i=>i.id===1130).overview.length);
+ for(const id of [2401,1211])assert.ok(c.techs.some(t=>t.recipes?.includes(recipesFor(c,id)[0].id)));
 });

@@ -40,7 +40,7 @@ def extract(html):
         paragraphs=parse_paragraphs(body)
         if paragraphs: return paragraphs
     # Some pages have a lead rather than an Overview heading. Exclude quotes,
-    # infoboxes and tables so the in-game description stays in the info popup.
+    # infoboxes and tables; the renderer prepends the separate in-game description.
     lead=re.sub(r'<(aside|blockquote|table)\b[^>]*>.*?</\1>', '', html, flags=re.S)
     lead=re.split(r'<h[1-6]\b',lead,maxsplit=1)[0]
     paragraphs=parse_paragraphs(lead)
