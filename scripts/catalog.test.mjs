@@ -7,7 +7,7 @@ const {pairs,recipesFor,batchesFor,catalogForDarkFog,isDefenseItem,overviewParag
 const c=JSON.parse(readFileSync(new URL('../public/data/catalog.json',import.meta.url),'utf8'));
 const ids=new Set(c.items.map(i=>i.id));
 const pinnedCompiled=ts.transpileModule(readFileSync(new URL('../src/lib/pinnedItems.ts',import.meta.url),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;
-const {addPinnedItem,normalizePinnedItems,movePinnedItem,loadPinnedItems,locationPinId,parseLocationPin,pinToken,resolvePinnedEntries}=await import('data:text/javascript;base64,'+Buffer.from(pinnedCompiled).toString('base64'));
+const {addPinnedItem,normalizePinnedItems,movePinnedItem,loadPinnedItems,locationPinId,parseLocationPin,pinToken,resolvePinnedEntries,normalizePinnedGroups,storeGroupedItem,removeGroupedItem,insertPinnedItem,classifyPinDrop,taskPinAdditions,applyTaskPinAdditions,orderPinnedGroup}=await import('data:text/javascript;base64,'+Buffer.from(pinnedCompiled).toString('base64'));
 test('pinned items recover safely from malformed device storage and keep a unique order',()=>{
  assert.deepEqual(normalizePinnedItems([1303,1101,1303,'1102',null,-1,0,1.5]),[1303,1101]);
  assert.deepEqual(normalizePinnedItems({ids:[1303]}),[]);
@@ -35,6 +35,91 @@ test('mixed item and location pins preserve legacy pins and resolve current name
  assert.equal(resolvePinnedEntries(['planet:p1'],[],[{...planet,parentId:null}])[0].name,'Unassigned system/IV');
  assert.deepEqual(movePinnedItem(pins,'system:s1',1303),['system:s1',1303,'planet:p1']);
  assert.deepEqual(addPinnedItem(pins,'system:s1'),pins);
+});
+test('planet task links hydrate on pin and new associations sync without undoing manual shortcut removal',()=>{
+ const planet={id:'p1',kind:'planet',parentId:'s1',name:'Home',checklist:[{id:'t1',itemIds:[1303,1101],requiredInputs:{1101:1303}}]};
+ const initial={pinned:[],links:{}};
+ const unpinned=taskPinAdditions([], [planet],initial);
+ assert.deepEqual(unpinned.additions,{});
+ const pinned=taskPinAdditions(['planet:p1'],[planet],unpinned.snapshot);
+ assert.deepEqual(pinned.additions,{'planet:p1':[1303,1101]});
+ const groups=applyTaskPinAdditions({'planet:p1':[1102]},pinned.additions);
+ assert.deepEqual(groups,{'planet:p1':[1102,1303,1101]});
+ const renamed=taskPinAdditions(['planet:p1'],[{...planet,name:'Renamed'}],pinned.snapshot);
+ assert.deepEqual(renamed.additions,{});
+ const removed=removeGroupedItem(groups,'planet:p1',1101);
+ assert.deepEqual(applyTaskPinAdditions(removed,renamed.additions),removed);
+ const newTask={...planet,checklist:[...planet.checklist,{id:'t2',itemIds:[1101,1102]}]};
+ const added=taskPinAdditions(['planet:p1'],[newTask],renamed.snapshot);
+ assert.deepEqual(added.additions,{'planet:p1':[1101,1102]});
+ assert.deepEqual(applyTaskPinAdditions(removed,added.additions),{'planet:p1':[1102,1303,1101]});
+ const unchanged=taskPinAdditions(['planet:p1'],[newTask],added.snapshot);
+ assert.deepEqual(unchanged.additions,{});
+ assert.equal(applyTaskPinAdditions(groups,{}),groups);
+ const unpin=taskPinAdditions([], [newTask],added.snapshot);
+ const repin=taskPinAdditions(['planet:p1'],[newTask],unpin.snapshot);
+ assert.deepEqual(repin.additions,{'planet:p1':[1303,1101,1102]});
+});
+test('task item removal removes group shortcuts after their final association is removed',()=>{
+ const before={id:'p1',kind:'planet',checklist:[{id:'a',itemIds:[1303,1101]},{id:'b',itemIds:[1101]}]};
+ const initial=taskPinAdditions(['planet:p1'],[before],{pinned:[],links:{}});
+ const oneLeft={...before,checklist:[{id:'a',itemIds:[1303]},{id:'b',itemIds:[1101]}]};
+ const first=taskPinAdditions(['planet:p1'],[oneLeft],initial.snapshot);
+ assert.deepEqual(first.removals,{});
+ const last=taskPinAdditions(['planet:p1'],[{...before,checklist:[{id:'a',itemIds:[1303]}]}],first.snapshot);
+ assert.deepEqual(last.removals,{'planet:p1':[1101]});
+ const groups={'planet:p1':[1102,1101,1303]};
+ assert.deepEqual(applyTaskPinAdditions(groups,last.additions,last.removals),{'planet:p1':[1102,1303]});
+ const cleared=taskPinAdditions([], [{...before,checklist:[]}],last.snapshot);
+ assert.deepEqual(cleared.removals,{'planet:p1':[1303]});
+});
+test('required inputs move directly behind their parent ahead of existing group items',()=>{
+ const tasks=[{id:'a',itemIds:[1303,1101,1102],requiredInputs:{1101:1303,1102:1303}}];
+ const previous=[1101,9999,1303,8888,1102];
+ assert.deepEqual(orderPinnedGroup(previous,tasks),[9999,1303,1101,1102,8888]);
+ assert.deepEqual(orderPinnedGroup([1303,8888,1102,1101],tasks),[1303,1101,1102,8888]);
+ assert.deepEqual(orderPinnedGroup(previous,[]),previous);
+ const ordered=orderPinnedGroup(previous,tasks);
+ assert.deepEqual(orderPinnedGroup(ordered,tasks),ordered);
+ const shared=[...tasks,{id:'b',itemIds:[7777,1101],requiredInputs:{1101:7777}}];
+ assert.deepEqual(orderPinnedGroup([1303,1101,7777,1102],shared),[1303,1102,7777,1101]);
+ const cycle=[{id:'a',itemIds:[1,2],requiredInputs:{1:2,2:1}}];
+ assert.deepEqual(orderPinnedGroup([1,2],cycle),[1,2]);
+ assert.deepEqual(previous,[1101,9999,1303,8888,1102]);
+});
+test('planet group required-input arrows reflect current to-do associations and deduplicate across tasks',()=>{
+ const item={id:1101,name:'Iron Ingot',icon:null},planet={id:'p1',kind:'planet',parentId:null,name:'Home',checklist:[{id:'t1',itemIds:[1101],requiredInputs:{1101:1303}},{id:'t2',itemIds:[1101]}]};
+ const groups={'planet:p1':[1101]};
+ const entry=resolvePinnedEntries(['planet:p1'],[item],[planet],groups)[0];
+ assert.deepEqual(entry.children,[{...item,requiredInput:true}]);
+ const changed=resolvePinnedEntries(['planet:p1'],[item],[{...planet,checklist:[{id:'t2',itemIds:[1101]}]}],groups)[0];
+ assert.deepEqual(changed.children,[item]);
+});
+test('planet groups deduplicate, transfer children, and preserve unrelated shortcuts',()=>{
+ const groups=normalizePinnedGroups({'planet:p1':[1303,1303,'1101',1101],'system:s1':[1303],invalid:[1102]});
+ assert.deepEqual(groups,{'planet:p1':[1303,1101]});
+ const copied=storeGroupedItem(groups,'planet:p2',1303,'external');
+ assert.deepEqual(copied,{'planet:p1':[1303,1101],'planet:p2':[1303]});
+ assert.deepEqual(storeGroupedItem(copied,'planet:p2',1303,'external'),copied);
+ const moved=storeGroupedItem(groups,'planet:p2',1303,{planet:'planet:p1'});
+ assert.deepEqual(moved,{'planet:p1':[1101],'planet:p2':[1303]});
+ assert.deepEqual(removeGroupedItem(moved,'planet:p2',1303),{'planet:p1':[1101],'planet:p2':[]});
+ assert.deepEqual(storeGroupedItem(groups,'system:s1',1303,'strip'),groups);
+ assert.deepEqual(groups,{'planet:p1':[1303,1101]});
+ const entries=resolvePinnedEntries(['planet:p1'],[{id:1303,name:'Processor',icon:null}],[{id:'p1',kind:'planet',parentId:null,name:'Home'}],groups);
+ assert.deepEqual(entries[0].children,[{id:1303,name:'Processor',icon:null}]);
+});
+test('planet center grouping and edge insertion remain distinct for item and location drags',()=>{
+ assert.deepEqual(classifyPinDrop(21,0,42,true),{kind:'group'});
+ assert.deepEqual(classifyPinDrop(3,0,42,true),{kind:'reorder',side:'before'});
+ assert.deepEqual(classifyPinDrop(39,0,42,true),{kind:'reorder',side:'after'});
+ assert.deepEqual(classifyPinDrop(21,0,42,false),{kind:'reorder',side:'after'});
+ const pins=['planet:p1',1303,'system:s1'];
+ assert.deepEqual(insertPinnedItem(pins,1303,'planet:p1','before'),[1303,'planet:p1','system:s1']);
+ assert.deepEqual(insertPinnedItem(pins,'planet:p1','system:s1','after'),[1303,'system:s1','planet:p1']);
+ assert.deepEqual(insertPinnedItem(pins,1101,'planet:p1','after'),['planet:p1',1101,1303,'system:s1']);
+ assert.deepEqual(insertPinnedItem(pins,1303,1303,'before'),pins);
+ assert.deepEqual(pins,['planet:p1',1303,'system:s1']);
 });
 test('dropping an item pins it once and preserves existing pin order',()=>{
  const pins=[1303,1101];

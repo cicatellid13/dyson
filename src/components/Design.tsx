@@ -4,7 +4,6 @@ import { NetworkTodos } from './NetworkTodos';
 import { LogisticsSearch } from './LogisticsSearch';
 import { PlanetTodoIcon } from './PlanetTodoIcon';
 import { priorityTaskSummary } from './PriorityTasks';
-import { PriorityFlag } from './PriorityFlag';
 import { NoteChecklist } from './NoteChecklist';
 import '../styles/planning.css';
 import '../styles/factoryPlanner.css';
@@ -169,7 +168,7 @@ export function Design({ catalog, pinnedLocations, onTogglePin, onLocationDrag }
   const parent = data.sections.find(s => s.id === active?.parentId);
   const currentSystem = active?.kind === 'system' ? active : parent;
   const creationSystem = data.sections.find(section => section.id === creation?.parentId);
-  const children = orderedSections(data.sections.filter(s => s.parentId === activeId)).sort((a, b) => Number(!!b.priority) - Number(!!a.priority));
+  const children = orderedSections(data.sections.filter(s => s.parentId === activeId));
   const roots = orderedSections(data.sections.filter(s => s.kind === 'system'));
   const unassigned = orderedSections(data.sections.filter(s => s.kind === 'planet' && s.parentId === null));
   function commit(next: DesignData) {
@@ -207,10 +206,6 @@ export function Design({ catalog, pinnedLocations, onTogglePin, onLocationDrag }
     commit(next); setActiveId(removed?.parentId ?? next.sections[0]?.id ?? null); setDeleteId(null);
   }
   function sectionButton(section: DesignSection, nested = false) {
-    const priorityNames = section.kind === 'system'
-      ? orderedSections(data.sections.filter(planet => planet.kind === 'planet' && planet.parentId === section.id && planet.priority)).map(planet => planet.name || 'Unnamed planet')
-      : section.priority ? [section.name || 'Unnamed planet'] : [];
-
     return <button key={section.id} className={`design-location ${nested ? 'nested' : ''} ${activeId === section.id ? 'active' : ''} ${dropTarget === section.id ? 'drop-target' : ''}`} draggable
       aria-expanded={section.kind === 'system' ? expandedSystems.has(section.id) : undefined}
       onDragStart={event => { event.stopPropagation(); themeDrag(event); setDraggingId(section.id); event.dataTransfer.effectAllowed = 'copyMove'; event.dataTransfer.setData('text/plain',section.id); const pin=locationPinId(section.kind,section.id); event.dataTransfer.setData('application/x-dsp-location',pin); onLocationDrag(pin); }}
@@ -231,7 +226,6 @@ export function Design({ catalog, pinnedLocations, onTogglePin, onLocationDrag }
               setNotesMode('todo', section.id);
             }
           }}><PlanetTodoIcon/></span>}
-        {priorityNames.length > 0 && <span className="priority-marker" data-tooltip={section.kind === 'system' ? priorityNames.join('\n') : 'Priority'} aria-label={`Priority planets: ${priorityNames.join(', ')}`}><PriorityFlag/></span>}
       </span>
     </button>;
   }
@@ -241,7 +235,7 @@ export function Design({ catalog, pinnedLocations, onTogglePin, onLocationDrag }
       <div className="design-create-buttons">{currentSystem && <button className="design-button" onClick={() => begin('planet', currentSystem.id, 'sidebar')} disabled={!!initial.error}>+ Planet</button>}<button className="design-button" onClick={() => begin('system')} disabled={!!initial.error}>+ System</button></div>
       {creation?.kind === 'planet' && creation.placement === 'sidebar' && creationSystem && <form className="design-create-form" onSubmit={add}><h3>New planet</h3><p className="design-parent-hint">Adding to <strong>{creationSystem.name || 'Unnamed system'}</strong></p><label>Planet name<input autoFocus aria-label="New planet name" value={name} maxLength={120} placeholder="e.g. Homeworld" onChange={event => setName(event.target.value)}/></label><div><button className="design-button" type="submit" disabled={!name.trim()}>Create planet</button><button type="button" onClick={() => setCreation(null)}>Cancel</button></div></form>}
       {creation?.kind === 'system'  && <form className="design-create-form" onSubmit={add}><h3>{creation.parentId ? 'Add planet to system' : `New ${creation.kind}`}</h3><label>Name<input autoFocus aria-label="New section name" value={name} maxLength={120} placeholder="e.g. Alpha Centauri" onChange={e => setName(e.target.value)}/></label><div><button className="design-button" type="submit" disabled={!name.trim()}>Create</button><button type="button" onClick={() => setCreation(null)}>Cancel</button></div></form>}
-      <LogisticsSearch data={data} catalog={catalog}/><nav aria-label="Logistics Network sections">{roots.map(root => <div key={root.id}><div className="system-nav-row">{sectionButton(root)}<button className="visualize-button" data-tooltip="visualize" aria-label={`Visualize ${root.name}`} aria-pressed={activeId===root.id&&graphSystem===root.id} onClick={()=>{const isOpen=activeId===root.id&&graphSystem===root.id;navigate(root.id);setGraphSystem(isOpen?null:root.id);}}><VisualizeIcon/></button></div>{expandedSystems.has(root.id) && orderedSections(data.sections.filter(s => s.parentId === root.id)).sort((a, b) => Number(!!b.priority) - Number(!!a.priority)).map(child => sectionButton(child, true))}</div>)}</nav>
+      <LogisticsSearch data={data} catalog={catalog}/><nav aria-label="Logistics Network sections">{roots.map(root => <div key={root.id}><div className="system-nav-row">{sectionButton(root)}<button className="visualize-button" data-tooltip="visualize" aria-label={`Visualize ${root.name}`} aria-pressed={activeId===root.id&&graphSystem===root.id} onClick={()=>{const isOpen=activeId===root.id&&graphSystem===root.id;navigate(root.id);setGraphSystem(isOpen?null:root.id);}}><VisualizeIcon/></button></div>{expandedSystems.has(root.id) && orderedSections(data.sections.filter(s => s.parentId === root.id)).map(child => sectionButton(child, true))}</div>)}</nav>
       {!!unassigned.length && <div className="design-unassigned"><h3>Needs a system</h3><p className="design-empty-small">Assign these existing planets to a system.</p>{unassigned.map(planet => sectionButton(planet))}</div>}
       {!roots.length && <p className="design-empty-small">Create a system first, then add planets inside it.</p>}
     </aside>
@@ -249,7 +243,7 @@ export function Design({ catalog, pinnedLocations, onTogglePin, onLocationDrag }
       {saveError && <div role="alert" className="design-error">{saveError}{!initial.error && <button className="design-button" onClick={() => commit(data)}>Retry saving</button>}</div>}
       {overview ? <NetworkTodos data={data} catalog={catalog} onOpen={(planetId,taskId)=>{navigate(planetId);setNotesMode('todo',planetId);setFocusedTask(taskId);}}/> : active ? <div key={active.id}>
         <div className="design-editor-top"><div className="eyebrow">{parent ? <><button onClick={() => navigate(parent.id)}>{parent.name || 'Unnamed system'}</button> / {active.name || 'Untitled planet'}</> : active.kind === 'system' ? 'STAR SYSTEM' : 'PLANET'}</div></div>
-        <div className="system-name-row">{active.kind==='planet'?<EditablePlanetName key={active.id} name={active.name} onChange={name=>patch({name})}/>:<label className="design-name">Name<input aria-label="Section name" value={active.name} maxLength={120} onChange={e => patch({name: e.target.value})} onBlur={() => { if (!active.name.trim()) patch({name: active.kind === 'planet' ? 'Untitled planet' : 'Untitled system'}); }}/></label>}<PinItemButton name={active.name||(active.kind==='planet'?'Untitled planet':'Unnamed system')} kind={active.kind} pinned={pinnedLocations.includes(locationPinId(active.kind,active.id))} onClick={()=>onTogglePin(active.kind,active.id)}/>{active.kind === 'planet' && <div className="planet-header-actions"><button type="button" className="planet-todo-button" aria-label="Open planet to-do" data-tooltip="To-do" data-priority-tasks={JSON.stringify(priorityTaskSummary(active.checklist))} onClick={() => setNotesMode('todo')}><PlanetTodoIcon/></button><button type="button" className={`planet-priority ${active.priority ? 'selected' : ''}`} aria-label={active.priority ? 'Remove planet priority' : 'Prioritize planet'} aria-pressed={!!active.priority} data-tooltip="prioritize" onClick={() => patch({priority: !active.priority})}><PriorityFlag/></button></div>}{active.kind === 'system' && <button className={`visualize-button ${graphSystem===active.id?'active':''}`} data-tooltip="visualize" aria-label={`Visualize ${active.name}`} aria-pressed={graphSystem===active.id} onClick={()=>setGraphSystem(graphSystem===active.id?null:active.id)}><VisualizeIcon/></button>}</div>
+        <div className="system-name-row">{active.kind==='planet'?<EditablePlanetName key={active.id} name={active.name} onChange={name=>patch({name})}/>:<label className="design-name">Name<input aria-label="Section name" value={active.name} maxLength={120} onChange={e => patch({name: e.target.value})} onBlur={() => { if (!active.name.trim()) patch({name: active.kind === 'planet' ? 'Untitled planet' : 'Untitled system'}); }}/></label>}<PinItemButton name={active.name||(active.kind==='planet'?'Untitled planet':'Unnamed system')} kind={active.kind} pinned={pinnedLocations.includes(locationPinId(active.kind,active.id))} onClick={()=>onTogglePin(active.kind,active.id)}/>{active.kind === 'planet' && <div className="planet-header-actions"><button type="button" className="planet-todo-button" aria-label="Open planet to-do" data-tooltip="To-do" data-priority-tasks={JSON.stringify(priorityTaskSummary(active.checklist))} onClick={() => setNotesMode('todo')}><PlanetTodoIcon/></button></div>}{active.kind === 'system' && <button className={`visualize-button ${graphSystem===active.id?'active':''}`} data-tooltip="visualize" aria-label={`Visualize ${active.name}`} aria-pressed={graphSystem===active.id} onClick={()=>setGraphSystem(graphSystem===active.id?null:active.id)}><VisualizeIcon/></button>}</div>
         {active.kind==='system' && graphSystem===active.id ? <SystemGraph key={active.id} planets={children} items={itemLookup} onClose={()=>setGraphSystem(null)}/> : <>
         {active.kind === 'planet' && <Specializations label="Planet type" single tags={active.planetType?[active.planetType]:[]} choices={labelChoices('planetTypes')} onChange={tags=>patch({planetType:tags[0]??''})} onRemember={tag=>rememberLabel('planetTypes',tag)}/>}
         {active.kind === 'planet' && <Specializations tags={active.specializations??[]} choices={labelChoices('specializationTypes')} onChange={specializations=>patch({specializations})} onRemember={tag=>rememberLabel('specializationTypes',tag)}/>}

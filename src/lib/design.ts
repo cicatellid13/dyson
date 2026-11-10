@@ -21,6 +21,7 @@ export type DesignSection = {
   notes: string;
   checklist?: ChecklistItem[];
   factories?: Record<string,SavedFactory>;
+  /** Legacy planet flags are accepted for compatibility but no longer displayed or used for sorting. */
   priority?: boolean;
   planetType?: string;
   specializations?: string[];

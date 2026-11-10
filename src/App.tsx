@@ -1,5 +1,5 @@
 import { PinnedItemStrip, PinItemButton } from './components/PinnedItemStrip';
-import { addPinnedItem, loadPinnedItems, locationPinId, parseLocationPin, resolvePinnedEntries, movePinnedItem, PINNED_ITEMS_KEY, type PinId } from './lib/pinnedItems';
+import { taskPinAdditions, applyTaskPinAdditions, type TaskPinSnapshot, PINNED_GROUPS_KEY, loadPinnedGroups, removeGroupedItem, storeGroupedItem, insertPinnedItem, addPinnedItem, loadPinnedItems, locationPinId, parseLocationPin, resolvePinnedEntries, movePinnedItem, PINNED_ITEMS_KEY, type PinId } from './lib/pinnedItems';
 import { RecipePreview } from './components/RecipePreview';
 import { UpdateControl } from './components/UpdateControl';
 import {NetworkButton,NetworkSearch,type NetworkRequest} from './components/NetworkSearch';
@@ -113,6 +113,15 @@ export function App(){
  const [quantity,setQuantity]=useState(1);
  const [tab,setTab]=useState<'recipe'|'chain'>('recipe');
  const [pinnedItems,setPinnedItems]=useState(loadPinnedItems);
+ const [pinnedGroups,setPinnedGroups]=useState(loadPinnedGroups);
+ const taskPinSnapshot=useRef<TaskPinSnapshot>({pinned:[],links:{}});
+ useEffect(()=>{
+  if(!cloud.ready)return;
+  const result=taskPinAdditions(pinnedItems,cloud.view.data.design.sections,taskPinSnapshot.current);
+  taskPinSnapshot.current=result.snapshot;
+  if(Object.keys(result.additions).length||Object.keys(result.removals).length)setPinnedGroups(previous=>applyTaskPinAdditions(previous,result.additions,result.removals));
+ },[pinnedItems,cloud.ready,cloud.view.data.design.sections]);
+ useEffect(()=>{try{localStorage.setItem(PINNED_GROUPS_KEY,JSON.stringify(pinnedGroups));}catch{/* Group shortcuts still work for this session. */}},[pinnedGroups]);
  const detailRef=useRef<HTMLElement|null>(null);
  const itemViews=useRef(new Map<number,{recipeId:number|null;quantity:number;tab:'recipe'|'chain';scroll:number}>());
  const [chainExpansion,setChainExpansion]=useSessionExpansion('catalog-chain-expansion');
@@ -228,7 +237,7 @@ export function App(){
   const expanded=chainExpansion.has(`open:${expansionKey}`)||depth<2&&!chainExpansion.has(`closed:${expansionKey}`);
   return <details className="tree-node" open={expanded} onToggle={event=>{const open=event.currentTarget.open;if(open===expanded)return;setChainExpansion(previous=>{const next=new Set(previous);next.delete(`open:${expansionKey}`);next.delete(`closed:${expansionKey}`);next.add(`${open?'open':'closed'}:${expansionKey}`);return next;});}} key={`${id}-${depth}`}><summary {...itemDragProps(id)} className={isDefenseItem(target)?'defense-item':''}><button className="ingredient-name" onClick={event=>{event.preventDefault();event.stopPropagation();navigate(id);}}><Icon item={target} count={count}/><strong>{target?.name}</strong></button><small>{b} batch{b!==1?'es':''} · {r.seconds*b}s</small><ItemJump id={id} name={target?.name}/></summary><div>{pairs(r.inputs).map(p=><div key={p.id}>{tree(p.id,p.count*b,[...path,id],depth+1)}</div>)}</div></details>;
  }
- const pinnedEntries=resolvePinnedEntries(pinnedItems,catalog.items,cloud.view.data.design.sections);
+ const pinnedEntries=resolvePinnedEntries(pinnedItems,catalog.items,cloud.view.data.design.sections,pinnedGroups);
  const activePinnedLocation=category==='Logistics Network'&&!networkOverview?cloud.view.data.design.sections.find(section=>section.id===activeLocation):undefined;
  if(!cloud.ready)return <div className="boot"><h1>DSP Toolkit</h1><p>{cloud.error || 'Opening your shared workspace…'}</p>{cloud.error && <button onClick={()=>{void initializePersistence();}}>Retry connection</button>}</div>;
  function sidebarCategory(c:string){return <button className={`${category===c?'nav active':'nav'} ${(c==='Favorites'||c==='Factory Planner') && draggedItem!==null?'favorite-drop-ready':''} ${(c==='Favorites'||c==='Factory Planner') && favoriteDropTarget===c?'favorite-drop-active':''}`} {...((c==='Favorites'||c==='Factory Planner')?itemDropProps(c,c):{})} key={c} onClick={()=>selectCategory(c)}><span>{c==='All items'?'▦':c==='Favorites'?'☆':c==='Buildings'?'▤':<CategoryIcon category={c}/>}</span>{c}<small>{c==='All items'?catalog.items.length:c==='Favorites'?favorites.filter(id=>itemMap.has(id)).length:''}</small></button>;}
@@ -238,7 +247,19 @@ export function App(){
    <img className="sphere-galaxy" src={`${import.meta.env.BASE_URL}art/galaxy-header.png`} alt="Panoramic galaxy surrounding a brilliant golden star with orbital collectors for a Dyson sphere"/>
    <div className="sphere-title"><span className="twinkling-star" aria-hidden="true">✦</span><h1>Dysons Sphere</h1></div>
  </section>
- <PinnedItemStrip acceptingItems={draggedLocation!==null||draggedItem!==null&&itemMap.has(draggedItem)} dropActive={favoriteDropTarget==='pinned-strip'} dropProps={itemDropProps('pinned-strip','Pinned items')} items={pinnedEntries} active={activePinnedLocation?locationPinId(activePinnedLocation.kind,activePinnedLocation.id):!['Logistics Network','Scratch Pad','Factory Planner'].includes(category)&&(!gridView||gridDetail)&&item?selected:null} onSelect={openPinned} onClose={id=>setPinnedItems(previous=>previous.filter(value=>value!==id))} onReorder={(source,target)=>setPinnedItems(previous=>movePinnedItem(previous,source,target))}/>
+ <PinnedItemStrip incomingItemId={draggedItem}
+  onStore={(planet,id,source)=>{
+   if(!itemMap.has(id)||!pinnedItems.includes(planet)||parseLocationPin(planet)?.kind!=='planet')return;
+   setPinnedGroups(previous=>storeGroupedItem(previous,planet,id,source));
+   if(source==='strip')setPinnedItems(previous=>previous.filter(pin=>pin!==id));
+  }}
+  onRemoveGrouped={(planet,id)=>setPinnedGroups(previous=>removeGroupedItem(previous,planet,id))}
+  onReorderGrouped={(planet,id,target)=>setPinnedGroups(previous=>({...previous,[planet]:movePinnedItem(previous[planet]??[],id,target) as number[]}))}
+  onInsert={(id,target,side,fromPlanet)=>{
+   if(typeof id==='number'&&!itemMap.has(id))return;
+   if(fromPlanet&&typeof id==='number')setPinnedGroups(previous=>removeGroupedItem(previous,fromPlanet,id));
+   setPinnedItems(previous=>insertPinnedItem(previous,id,target,side));
+  }} acceptingItems={draggedLocation!==null||draggedItem!==null&&itemMap.has(draggedItem)} dropActive={favoriteDropTarget==='pinned-strip'} dropProps={itemDropProps('pinned-strip','Pinned items')} items={pinnedEntries} active={activePinnedLocation?locationPinId(activePinnedLocation.kind,activePinnedLocation.id):!['Logistics Network','Scratch Pad','Factory Planner'].includes(category)&&(!gridView||gridDetail)&&item?selected:null} onSelect={openPinned} onClose={id=>setPinnedItems(previous=>previous.filter(value=>value!==id))} onReorder={(source,target)=>setPinnedItems(previous=>movePinnedItem(previous,source,target))}/>
  {error&&<div className="error" role="alert">{error}<button onClick={()=>updateWorkspace(data=>data)}>Retry saving</button></div>}
  {cloud.view.message && <div className="sync-banner" role="status">{cloud.view.message}{cloud.view.status==='conflict'?<><button onClick={()=>{void resolveWorkspace('cloud');}}>Use cloud version</button><button onClick={()=>{void resolveWorkspace('local');}}>Keep this device’s version</button></>:<button onClick={()=>{void retrySync();}}>Retry sync</button>}</div>}
  <div className={`factory-planner-session ${draggedItem!==null?'favorite-drop-ready':''} ${favoriteDropTarget==='planner-pane'?'favorite-drop-active':''}`} {...itemDropProps('planner-pane','Factory Planner')} hidden={category!=='Factory Planner'}><FactoryPlanner catalog={catalog} request={plannerRequest}/></div>
