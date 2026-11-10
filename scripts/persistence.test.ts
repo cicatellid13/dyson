@@ -5,11 +5,49 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { mergeWorkspace, encode, decode, workspacePatch } from '../electron/backend/merge';
 import { Persistence } from '../electron/backend/persistence';
-import { emptyWorkspace, type Workspace } from '../src/lib/workspace';
+import { emptyWorkspace, validateWorkspace, type Workspace } from '../src/lib/workspace';
+import { migrateLocalPins } from '../src/lib/pinnedItems';
 import type { Database } from '../electron/backend/database';
 import type { Catalog } from '../src/lib/catalog';
 const fixture = (): Workspace => ({ ...emptyWorkspace(), design: { version: 1, sections: [{ id:'sol', kind:'system', parentId:null, name:'Sol', notes:'', imports:[], exports:[] }] } });
 const copy = <T,>(x:T):T => structuredClone(x);
+test('pins round-trip through shared storage; migration combines local backups without replacing shared order',()=>{
+ const data=fixture();data.pinned={items:['planet:home',1303,'system:sol'],groups:{'planet:home':[1303,1101]}};
+ assert.deepEqual(decode(encode(data)),data);
+ assert.deepEqual(migrateLocalPins(data.pinned,[1102,1303],{'planet:home':[1101,1102]}),{items:['planet:home',1303,'system:sol',1102],groups:{'planet:home':[1303,1101,1102]}});
+ assert.deepEqual(migrateLocalPins(undefined,[1303],{}),{items:[1303],groups:{}});
+ assert.throws(()=>validateWorkspace({...data,pinned:{items:['planet:unsafe.path'],groups:{}}}));
+ assert.throws(()=>validateWorkspace({...data,pinned:{items:[],groups:{'planet:unsafe.path':[1]}}}));
+ assert.throws(()=>validateWorkspace({...data,pinned:{items:[],groups:{'planet:home':[-1]}}}));
+});
+test('independent pin additions, removals, groups and workspace edits merge across devices',()=>{
+ const base=fixture();base.pinned={items:[1303,1101],groups:{'planet:home':[1303]}};
+ const mac=copy(base),windows=copy(base);
+ mac.pinned!.items=[1101,1102];mac.pinned!.groups['planet:home'].push(1101);
+ windows.pinned!.items.push('system:sol');windows.pinned!.groups['planet:other']=[1102];windows.design.sections[0].notes='Windows note';
+ const merged=mergeWorkspace(base,mac,windows);
+ assert.deepEqual(merged.pinned,{items:[1101,1102,'system:sol'],groups:{'planet:home':[1303,1101],'planet:other':[1102]}});
+ assert.equal(merged.design.sections[0].notes,'Windows note');
+ const a=copy(base),b=copy(base);a.pinned!.groups['planet:home'].push(1101);b.pinned!.groups['planet:home'].push(1102);
+ assert.deepEqual(mergeWorkspace(base,a,b).pinned!.groups['planet:home'],[1303,1101,1102]);
+});
+test('pins preserve deliberate order, detect competing reorders, and survive older clients without pin fields',()=>{
+ const base=fixture();base.pinned={items:[1,2,3],groups:{'planet:home':[1,2,3]}};
+ const mac=copy(base),windows=copy(base);mac.pinned!.items=[3,1,2];windows.darkFog=true;
+ assert.deepEqual(mergeWorkspace(base,mac,windows).pinned!.items,[3,1,2]);
+ windows.pinned!.items=[2,1,3];assert.throws(()=>mergeWorkspace(base,mac,windows),/conflict/);
+ const old=copy(base);delete old.pinned;old.design.sections[0].notes='Old client note';
+ assert.deepEqual(mergeWorkspace(base,old,base).pinned,base.pinned);
+ const clear=copy(base);clear.pinned={items:[],groups:{'planet:home':[]}};
+ assert.deepEqual(mergeWorkspace(base,clear,base).pinned,clear.pinned);
+});
+test('pin storage patches are scoped and never erase pins when an older client omits them',()=>{
+ const base=fixture();base.pinned={items:[1303],groups:{'planet:home':[1303]}};
+ const next=copy(base);next.pinned!.items.push(1101);next.pinned!.groups['planet:home'].push(1101);
+ assert.deepEqual(workspacePatch(encode(base),encode(next)),{set:{'data.pinned.items':[1303,1101],'data.pinned.groups.planet:home':[1303,1101]},unset:{}});
+ const old=copy(base);delete old.pinned;old.darkFog=true;
+ assert.deepEqual(workspacePatch(encode(base),encode(old)),{set:{'data.darkFog':true},unset:{}});
+});
 test('merges independent notes, favorites and settings across devices', () => {
  const base=fixture(), local=copy(base), remote=copy(base);
  local.design.sections[0].notes='Local note'; local.favorites=[1]; remote.favorites=[2]; remote.darkFog=true;
@@ -35,10 +73,10 @@ test('offline saves survive restart; recovery, revision retry and conflicts pres
  let p=new Persistence(db,cache,()=>{});
  try {
   await p.initialize(fixture(),bundled);
-  const next=fixture();next.design.sections[0].notes='saved offline';next.planning={folders:[{id:'folder',name:'Factory'}],notes:[{id:'note',folderId:'folder',title:'Smelters',body:'Keep this offline plan'}]};offline=true;
+  const next=fixture();next.pinned={items:['system:sol',1303],groups:{'planet:home':[1303,1101]}};next.design.sections[0].notes='saved offline';next.planning={folders:[{id:'folder',name:'Factory'}],notes:[{id:'note',folderId:'folder',title:'Smelters',body:'Keep this offline plan'}]};offline=true;
   await p.save(next,fixture());await p.sync(); assert.equal(p.view().status,'offline');await p.close();
-  p=new Persistence(db,cache,()=>{});await p.initialize(fixture(),bundled);assert.equal(p.view().data.design.sections[0].notes,'saved offline');assert.equal(p.view().data.planning.notes[0].body,'Keep this offline plan');
-  offline=false;collisions=1;await p.sync();assert.equal(remote.design.sections[0].notes,'saved offline');assert.equal(writes,2);
+  p=new Persistence(db,cache,()=>{});await p.initialize(fixture(),bundled);assert.equal(p.view().data.design.sections[0].notes,'saved offline');assert.equal(p.view().data.planning.notes[0].body,'Keep this offline plan');assert.deepEqual(p.view().data.pinned,next.pinned);
+  offline=false;collisions=1;await p.sync();assert.equal(remote.design.sections[0].notes,'saved offline');assert.equal(writes,2);assert.deepEqual(remote.pinned,next.pinned);
   assert.equal((await p.initialize(fixture(),bundled)).view.data.design.sections[0].notes,'saved offline');
   const before=copy(p.view().data), recovered=copy(before);recovered.darkFog=true;await p.close();
   p=new Persistence(db,cache,()=>{});await p.initialize(fixture(),bundled,{base:before,data:recovered});assert.equal(remote.darkFog,true);
@@ -197,4 +235,23 @@ test('location to-dos round-trip and merge with independent notes edits', () => 
  assert.equal(merged.design.sections[0].notes,'Keep this note');
  const invalid=copy(local);invalid.design.sections[0].checklist![0].type='invalid' as never;
  assert.throws(()=>decode(encode(invalid)));
+});
+
+test('two device sessions exchange pin order, removals and planet groups through shared storage',async()=>{
+ const dir=await mkdtemp(path.join(tmpdir(),'dsp-pin-devices-'));
+ let remote=fixture(),revision=0;
+ const db=()=>({seedCatalog:async(c:Catalog)=>c,initializeWorkspace:async()=>({data:copy(remote),revision}),readWorkspace:async()=>({data:copy(remote),revision}),writeWorkspace:async(_before:Workspace,next:Workspace,expected:number)=>{if(expected!==revision)return false;remote=copy(next);revision++;return true;},close:async()=>{}} as unknown as Database);
+ const mac=new Persistence(db(),path.join(dir,'mac.json'),()=>{}),windows=new Persistence(db(),path.join(dir,'windows.json'),()=>{});
+ try{
+  await mac.initialize(fixture(),{} as Catalog);await windows.initialize(fixture(),{} as Catalog);
+  const original=copy(mac.view().data),pinned=copy(original);
+  pinned.pinned={items:[1303,'system:sol','planet:home'],groups:{'planet:home':[1303,1101]}};
+  await mac.save(pinned,original);await mac.sync();await windows.sync();
+  assert.deepEqual(windows.view().data.pinned,pinned.pinned);
+  const before=copy(windows.view().data),edited=copy(before);
+  edited.pinned={items:['planet:home',1303],groups:{'planet:home':[1101]}};
+  await windows.save(edited,before);await windows.sync();await mac.sync();
+  assert.deepEqual(mac.view().data.pinned,edited.pinned);
+  assert.deepEqual(remote.pinned,edited.pinned);
+ }finally{await mac.close();await windows.close();await rm(dir,{recursive:true,force:true});}
 });

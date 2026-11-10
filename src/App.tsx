@@ -1,5 +1,5 @@
 import { PinnedItemStrip, PinItemButton } from './components/PinnedItemStrip';
-import { taskPinAdditions, applyTaskPinAdditions, type TaskPinSnapshot, PINNED_GROUPS_KEY, loadPinnedGroups, removeGroupedItem, storeGroupedItem, insertPinnedItem, addPinnedItem, loadPinnedItems, locationPinId, parseLocationPin, resolvePinnedEntries, movePinnedItem, PINNED_ITEMS_KEY, type PinId } from './lib/pinnedItems';
+import { taskPinAdditions, applyTaskPinAdditions, type TaskPinSnapshot, type PinnedGroups, removeGroupedItem, storeGroupedItem, insertPinnedItem, addPinnedItem, locationPinId, parseLocationPin, resolvePinnedEntries, movePinnedItem, type PinId } from './lib/pinnedItems';
 import { RecipePreview } from './components/RecipePreview';
 import { UpdateControl } from './components/UpdateControl';
 import {NetworkButton,NetworkSearch,type NetworkRequest} from './components/NetworkSearch';
@@ -16,7 +16,7 @@ import '@fontsource/orbitron/600.css';
 import { Planning } from './components/Planning';
 import { undoRemoval, dismissRemoval, initializePersistence, useWorkspace, updateWorkspace, resolveWorkspace, retrySync } from './lib/persistence';
 import { CategoryIcon } from './components/CategoryIcon';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
 import { batchesFor, pairs, recipesFor, isDefenseItem, catalogForDarkFog, type Catalog, type Item } from './lib/catalog';
 import snapshot from '../public/data/catalog.json';
 import { Design } from './components/Design';
@@ -112,8 +112,14 @@ export function App(){
  const [recipeId,setRecipeId]=useState<number|null>(null);
  const [quantity,setQuantity]=useState(1);
  const [tab,setTab]=useState<'recipe'|'chain'>('recipe');
- const [pinnedItems,setPinnedItems]=useState(loadPinnedItems);
- const [pinnedGroups,setPinnedGroups]=useState(loadPinnedGroups);
+ const pinnedItems=cloud.view.data.pinned?.items??[];
+ const pinnedGroups=cloud.view.data.pinned?.groups??{};
+ function setPinnedItems(action:SetStateAction<PinId[]>){
+  updateWorkspace(data=>{const current=data.pinned??{items:[],groups:{}};const items=typeof action==='function'?action(current.items):action;return items===current.items?data:{...data,pinned:{...current,items}};});
+ }
+ function setPinnedGroups(action:SetStateAction<PinnedGroups>){
+  updateWorkspace(data=>{const current=data.pinned??{items:[],groups:{}};const groups=typeof action==='function'?action(current.groups):action;return groups===current.groups?data:{...data,pinned:{...current,groups}};});
+ }
  const taskPinSnapshot=useRef<TaskPinSnapshot>({pinned:[],links:{}});
  useEffect(()=>{
   if(!cloud.ready)return;
@@ -121,11 +127,9 @@ export function App(){
   taskPinSnapshot.current=result.snapshot;
   if(Object.keys(result.additions).length||Object.keys(result.removals).length)setPinnedGroups(previous=>applyTaskPinAdditions(previous,result.additions,result.removals));
  },[pinnedItems,cloud.ready,cloud.view.data.design.sections]);
- useEffect(()=>{try{localStorage.setItem(PINNED_GROUPS_KEY,JSON.stringify(pinnedGroups));}catch{/* Group shortcuts still work for this session. */}},[pinnedGroups]);
  const detailRef=useRef<HTMLElement|null>(null);
  const itemViews=useRef(new Map<number,{recipeId:number|null;quantity:number;tab:'recipe'|'chain';scroll:number}>());
  const [chainExpansion,setChainExpansion]=useSessionExpansion('catalog-chain-expansion');
- useEffect(()=>{try{localStorage.setItem(PINNED_ITEMS_KEY,JSON.stringify(pinnedItems));}catch{/* Pins still work for this session. */}},[pinnedItems]);
  function rememberItemView(){
   itemViews.current.set(selected,{recipeId,quantity,tab,scroll:detailRef.current?.scrollTop??itemViews.current.get(selected)?.scroll??0});
  }

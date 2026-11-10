@@ -1,3 +1,4 @@
+import { loadPinnedItems, loadPinnedGroups, migrateLocalPins, PINNED_MIGRATION_KEY } from './pinnedItems';
 import { removalLabel, restoreRemoval } from './removalUndo';
 import { emptyPlanning } from './planning';
 import { useSyncExternalStore } from 'react';
@@ -39,6 +40,14 @@ export function initializePersistence() {
         if (pending || state.error) return;
         state = { ...state, view }; emit();
       });
+      if(localStorage.getItem(PINNED_MIGRATION_KEY)!=='1'){
+        const pins=loadPinnedItems(),groups=loadPinnedGroups();
+        if(pins.length||Object.values(groups).some(ids=>ids.length)){
+          updateWorkspace(current=>({...current,pinned:migrateLocalPins(current.pinned,pins,groups)}));
+          await flushWorkspaceWrites();
+        }
+        localStorage.setItem(PINNED_MIGRATION_KEY,'1');
+      }
     } catch (error) { state = { ...state, error: error instanceof Error ? error.message : 'Unable to open workspace.' }; initialization = undefined; }
     emit();
   })();

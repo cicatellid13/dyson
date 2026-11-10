@@ -4,6 +4,7 @@ type PlanetTask = {id:string;itemIds?:number[];requiredInputs?:Record<string,num
 type TaskSection = {id:string;kind:'planet'|'system';checklist?:PlanetTask[]};
 export type TaskPinSnapshot = {pinned:string[];links:Record<string,string[]>};
 export type PinnedGroups = Record<string,number[]>;
+export type PinnedState = {items:PinId[];groups:PinnedGroups};
 export type PinItemSource = 'external'|'strip'|{planet:string};
 export type PinnedStripEntry = {id:PinId;name:string;icon:string|null;kind:'item'|'planet'|'system';children?:PinnedGroupItem[]};
 export type PinDropSide = 'before'|'after';
@@ -36,6 +37,24 @@ export function resolvePinnedEntries(ids:PinId[],items:{id:number;name:string;ic
 
 export const PINNED_ITEMS_KEY = 'dsp-pinned-items-v1';
 export const PINNED_GROUPS_KEY = 'dsp-pinned-planet-groups-v1';
+export const PINNED_MIGRATION_KEY = 'dsp-shared-pins-migrated-v1';
+
+export function validatePinnedState(value:unknown):PinnedState {
+  if(!value||typeof value!=='object'||Array.isArray(value))throw Error('Invalid pinned strip.');
+  const state=value as PinnedState;
+  const validLocation=(id:PinId)=>{const location=parseLocationPin(id);return !!location&&/^[a-zA-Z0-9_-]+$/.test(location.id)&&!['__proto__','constructor','prototype'].includes(location.id);};
+  if(!Array.isArray(state.items)||state.items.length>2000||state.items.some(id=>typeof id==='number'? !Number.isSafeInteger(id)||id<=0:!validLocation(id)))throw Error('Invalid pinned shortcuts.');
+  if(!state.groups||typeof state.groups!=='object'||Array.isArray(state.groups)||Object.keys(state.groups).length>2000)throw Error('Invalid pinned groups.');
+  for(const [key,ids] of Object.entries(state.groups))if(!validLocation(key)||parseLocationPin(key)?.kind!=='planet'||!Array.isArray(ids)||ids.length>2000||ids.some(id=>!Number.isSafeInteger(id)||id<=0))throw Error('Invalid pinned group.');
+  return {items:[...new Set(state.items)],groups:Object.fromEntries(Object.entries(state.groups).map(([key,ids])=>[key,[...new Set(ids)]]))};
+}
+
+/** Import this device's legacy shortcuts once, retaining the shared order first. */
+export function migrateLocalPins(shared:PinnedState|undefined,items:PinId[],groups:PinnedGroups):PinnedState {
+  const merged:PinnedState={items:[...new Set([...(shared?.items??[]),...items])],groups:{...shared?.groups}};
+  for(const [key,ids] of Object.entries(groups))merged.groups[key]=[...new Set([...(merged.groups[key]??[]),...ids])];
+  return validatePinnedState(merged);
+}
 
 /** Required-input blocks override an item's previous standalone position. */
 export function orderPinnedGroup(ids:number[],tasks:PlanetTask[]):number[] {
@@ -86,8 +105,12 @@ export function normalizePinnedGroups(value:unknown):PinnedGroups {
   if(!value||typeof value!=='object'||Array.isArray(value))return {};
   return Object.fromEntries(Object.entries(value).filter(([key])=>parseLocationPin(key)?.kind==='planet').map(([key,ids])=>[key,normalizePinnedItems(ids).filter((id):id is number=>typeof id==='number')]));
 }
+function readLocalPinData(key:string):string {
+  const storage=(globalThis as unknown as {localStorage?:{getItem:(key:string)=>string|null}}).localStorage;
+  return storage?.getItem(key)??'null';
+}
 export function loadPinnedGroups():PinnedGroups {
-  try{return normalizePinnedGroups(JSON.parse(localStorage.getItem(PINNED_GROUPS_KEY)??'null'));}catch{return {};}
+  try{return normalizePinnedGroups(JSON.parse(readLocalPinData(PINNED_GROUPS_KEY)));}catch{return {};}
 }
 export function removeGroupedItem(groups:PinnedGroups,planet:string,id:number):PinnedGroups {
   return {...groups,[planet]:(groups[planet]??[]).filter(item=>item!==id)};
@@ -119,7 +142,7 @@ export function normalizePinnedItems(value: unknown): PinId[] {
 }
 
 export function loadPinnedItems(): PinId[] {
-  try { return normalizePinnedItems(JSON.parse(localStorage.getItem(PINNED_ITEMS_KEY) ?? 'null')); }
+  try { return normalizePinnedItems(JSON.parse(readLocalPinData(PINNED_ITEMS_KEY))); }
   catch { return []; }
 }
 
