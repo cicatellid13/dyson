@@ -13,6 +13,7 @@ type State = { profileId:string;profiles:ProfileInfo[];switching:boolean;profile
 let state: State = { profileId:'shared',profiles:[{id:'shared',name:'Current play-through',createdAt:''}],switching:false,ready: false, view: { data: emptyWorkspace(), status: 'pending', message: '' }, catalog: null, error: '' };
 const listeners = new Set<() => void>();
 let initialization: Promise<void> | undefined;
+let profileRefreshInstalled=false;
 let writes = Promise.resolve();
 let lastRemoval:{before:Workspace;after:Workspace}|null=null;
 let restoring=false;
@@ -45,6 +46,12 @@ export function initializePersistence() {
       const result = await window.dspWiki.loadWorkspace(legacy(), JSON.parse(localStorage.getItem(recoveryKey()) || 'null') || undefined);
       state = { ...state,...(result.profileId?{profileId:result.profileId,profiles:result.profiles}:{}),ready: true, view: result.view, catalog: result.catalog, error: '' };
       localStorage.removeItem(recoveryKey());
+      if(!profileRefreshInstalled){
+        const refreshProfileList=()=>{if(!state.switching)void refreshProfiles().catch(()=>{});};
+        window.addEventListener('focus',refreshProfileList);
+        window.setInterval(refreshProfileList,30000);
+        profileRefreshInstalled=true;
+      }
       window.dspWiki.onWorkspaceChanged(view => {
         if (pending || state.error || state.switching) return;
         state = { ...state, view }; emit();
@@ -98,9 +105,14 @@ export function useWorkspace() { return useSyncExternalStore(listener => { liste
 
 export async function flushWorkspaceWrites() { await writes; if(state.error) throw Error('Workspace could not be saved.'); }
 
-export async function refreshProfiles(){
-  const index=await window.dspWiki!.listProfiles();
-  state={...state,profiles:index.profiles};emit();
+let profileRefresh:Promise<void>|undefined;
+function refreshProfiles(){
+  if(profileRefresh)return profileRefresh;
+  profileRefresh=(async()=>{
+    const index=await window.dspWiki!.listProfiles();
+    if(JSON.stringify(state.profiles)!==JSON.stringify(index.profiles)){state={...state,profiles:index.profiles};emit();}
+  })().finally(()=>{profileRefresh=undefined;});
+  return profileRefresh;
 }
 async function changeProfile(open:()=>Promise<ProfileWorkspace>){
   if(state.switching)return;

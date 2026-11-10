@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ThemedSelect } from './ThemedSelect';
-import { createProfile,refreshProfiles,renameProfile,switchProfile,useWorkspace } from '../lib/persistence';
+import { createProfile,renameProfile,switchProfile,useWorkspace } from '../lib/persistence';
 
 export function ProfileControl(){
   const cloud=useWorkspace();
@@ -28,6 +28,5 @@ export function ProfileControl(){
       <div><button type="submit" disabled={!name.trim()||locked}>{mode==='new'?'Create':'Save name'}</button><button type="button" disabled={busy} onClick={()=>setMode(null)}>Cancel</button></div>
     </form>}
     {(error||cloud.profileError)&&<p className="profile-error" role="alert">{error||cloud.profileError}</p>}
-    <button type="button" className="profile-refresh" disabled={locked} onClick={()=>{setBusy(true);void refreshProfiles().catch(error=>setError(error instanceof Error?error.message:'Unable to refresh play-throughs.')).finally(()=>setBusy(false));}}>Refresh saved play-throughs</button>
   </section>;
 }
