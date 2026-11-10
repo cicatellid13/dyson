@@ -1,5 +1,8 @@
 import { useCallback, useSyncExternalStore, type SetStateAction } from 'react';
 
+let profileScope='shared';
+export function setSessionProfile(id:string){profileScope=id;}
+
 // Renderer memory only: survives navigation, never written to disk or MongoDB.
 const groups = new Map<string, Set<string>>();
 const listeners = new Set<() => void>();
@@ -9,6 +12,7 @@ function snapshot(key: string) {
   return groups.get(key)!;
 }
 export function useSessionExpansion(key: string) {
+  key=`${profileScope}:${key}`;
   const read = useCallback(() => snapshot(key), [key]);
   const expanded = useSyncExternalStore(subscribe, read, read);
   const setExpanded = useCallback((action: SetStateAction<Set<string>>) => {
@@ -22,6 +26,7 @@ export function useSessionExpansion(key: string) {
 
 const selections = new Map<string, string | null>();
 export function useSessionSelection(key: string, initial: string | null = null) {
+  key=`${profileScope}:${key}`;
   const read = useCallback(() => selections.has(key) ? selections.get(key)! : initial, [key, initial]);
   const selected = useSyncExternalStore(subscribe, read, read);
   const setSelected = useCallback((action: SetStateAction<string | null>) => {

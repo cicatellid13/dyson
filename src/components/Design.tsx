@@ -24,7 +24,7 @@ import { SystemGraph, VisualizeIcon } from './SystemGraph';
 import { AutoTextarea } from './AutoTextarea';
 import { LogisticsArrow } from './LogisticsArrow';
 import { useWorkspace, updateWorkspace } from '../lib/persistence';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { isDefenseItem, type Catalog, type Item } from '../lib/catalog';
 import { createSection, removeSection, orderedSections, reorderSections, type DesignData, type DesignSection, type TradeEntry } from '../lib/design';
 import '../styles/design.css';
@@ -38,6 +38,16 @@ function TradeList({ direction, entries, items, sections, onChange, collapsible 
   const [advanced,setAdvanced]=useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
   const [message, setMessage] = useState('');
+  const panel=useRef<HTMLElement>(null);
+  const [focusEntry,setFocusEntry]=useState<{id:string}|null>(null);
+  useEffect(()=>{
+    if(!focusEntry)return;
+    const frame=requestAnimationFrame(()=>{
+      const entry=Array.from(panel.current?.querySelectorAll<HTMLElement>('[data-network-entry]')??[]).find(element=>element.dataset.networkEntry===focusEntry.id);
+      entry?.scrollIntoView({block:'center',behavior:'smooth'});
+    });
+    return()=>cancelAnimationFrame(frame);
+  },[focusEntry]);
   const label = direction === 'imports' ? 'Imports' : 'Exports';
   const sortedItems = useMemo(() => [...items].sort((a,b) => a.name.localeCompare(b.name)), [items]);
   const lookup = useMemo(() => new Map(items.map(item => [item.id, item])), [items]);
@@ -48,12 +58,19 @@ function TradeList({ direction, entries, items, sections, onChange, collapsible 
     event.preventDefault();
     const item = items.find(i => i.name.toLowerCase() === search.trim().toLowerCase());
     if (!item) { setMessage('Choose an item from the suggestions.'); return; }
+    const existing=entries.find(entry=>entry.itemId===item.id);
+    if(existing){
+      setExpandedEntries(current=>new Set([...current,existing.id]));
+      setFocusEntry({id:existing.id});
+      setSearch('');setMessage('');
+      return;
+    }
     const id = crypto.randomUUID();
     onChange([...entries, { id, itemId: item.id, amount: '', unit: 'items/min', destination: '' }]);
     setExpandedEntries(current => new Set([...current, id]));
     setSearch(''); setMessage('');
   }
-  return <section className="trade-panel" aria-label={label}>
+  return <section ref={panel} className="trade-panel" aria-label={label}>
     <div className="design-section-heading"><h3><LogisticsArrow direction={direction}/> {label}{orderedEntries.length>0&&<RouteStatus ready={!issues.length} message={issues.length?`${issues.length} ${direction} need matching routes.`:`All ${direction} have matching routes.`} direction={direction} issues={issues}/>}</h3><span>{orderedEntries.length} entries</span></div>
     <form className="trade-add" onSubmit={add}>
       <ItemPicker label={`Add ${direction} item`} items={sortedItems} value={search} onChange={value => { setSearch(value); setMessage(''); }}/>
@@ -62,6 +79,7 @@ function TradeList({ direction, entries, items, sections, onChange, collapsible 
     {message && <p role="alert" className="design-warning">{message}</p>}
     <div className="trade-entries">{orderedEntries.map(entry => {
       const item = lookup.get(entry.itemId);
+      const pendingPlanets=sections.filter(s=>s.kind==='planet'&&s.id!==currentPlanetId&&routePlanets(entry).includes(s.id)&&!routeLinks(entry)[s.id]);
       const toggle=()=>setExpandedEntries(current=>{const next=new Set(current);if(next.has(entry.id))next.delete(entry.id);else next.add(entry.id);return next;});
       return <div className="trade-entry" data-network-entry={entry.id} key={entry.id}>
         <div className="input-access-row planet-route-heading" {...itemActions.dragProps(entry.itemId)}>
@@ -76,7 +94,7 @@ function TradeList({ direction, entries, items, sections, onChange, collapsible 
           <label>Unit<ThemedSelect aria-label={`${item?.name} ${direction} unit`} value={entry.unit} onChange={e => patch(entry.id, { unit: e.target.value as TradeEntry['unit'] })}><option>items/min</option><option>items/s</option><option>items</option></ThemedSelect></label>
         </div>}
         {(!collapsible || expandedEntries.has(entry.id)) && <div className="trade-entry-options">{direction==='imports'&&currentPlanetId&&<NetworkButton id={entry.itemId} catalog={sourceCatalog} consumer={{planetId:currentPlanetId,entryId:entry.id}}/>}<MultiPlanetPicker sections={sections} entry={entry} ownerId={currentPlanetId} onChange={changes=>patch(entry.id,changes)}/>
-        {currentPlanetId && routePlanets(entry).some(id=>!routeLinks(entry)[id]&&sections.some(s=>s.kind==='planet'&&s.id===id&&s.id!==currentPlanetId)) && <button type="button" className="create-matching-route" aria-label={`Create ${direction==='exports'?'import':'export'}`} data-tooltip={`Create or link the matching ${direction==='exports'?'import':'export'} on all selected planets`} onClick={()=>updateWorkspace(current=>({...current,design:linkRoute(current.design,currentPlanetId,direction,entry.id)}))}><svg className="matching-route-icon" width="120" height="48" viewBox="0 0 120 48" fill="none" aria-hidden="true"><g stroke="#78dfb8" strokeWidth="2.4"><circle cx="21" cy="24" r="14" fill="#65cba5" fillOpacity=".8"/><ellipse cx="21" cy="24" rx="21" ry="6" transform="rotate(-30 21 24)"/></g><path d="M48 24h19m-6-6 6 6-6 6" stroke="#78dfb8" strokeWidth="2.7" strokeLinecap="round" strokeLinejoin="round"/><g stroke="#54d7f1" strokeWidth="2.4"><circle cx="92" cy="21" r="17"/><ellipse cx="92" cy="21" rx="25" ry="7" transform="rotate(-30 92 21)"/></g><circle cx="106" cy="36" r="12" fill="#68ddb2" stroke="#173f34" strokeWidth="2"/><path d="M100 36h12m-6-6v12" stroke="#16483d" strokeWidth="2.5" strokeLinecap="round"/></svg></button>}
+        {currentPlanetId && pendingPlanets.length>0 && <button type="button" className="create-matching-route" aria-label={`Map ${pendingPlanets.length} new ${pendingPlanets.length===1?'planet':'planets'}`} data-tooltip={`Create or link the matching ${direction==='exports'?'import':'export'} only on: ${pendingPlanets.map(planet=>planet.name).join(', ')}. Existing mappings stay linked.`} onClick={()=>updateWorkspace(current=>({...current,design:linkRoute(current.design,currentPlanetId,direction,entry.id)}))}><span className="pending-route-label">New · {pendingPlanets.length}</span><svg className="matching-route-icon" width="120" height="48" viewBox="0 0 120 48" fill="none" aria-hidden="true"><g stroke="#78dfb8" strokeWidth="2.4"><circle cx="21" cy="24" r="14" fill="#65cba5" fillOpacity=".8"/><ellipse cx="21" cy="24" rx="21" ry="6" transform="rotate(-30 21 24)"/></g><path d="M48 24h19m-6-6 6 6-6 6" stroke="#78dfb8" strokeWidth="2.7" strokeLinecap="round" strokeLinejoin="round"/><g stroke="#54d7f1" strokeWidth="2.4"><circle cx="92" cy="21" r="17"/><ellipse cx="92" cy="21" rx="25" ry="7" transform="rotate(-30 92 21)"/></g><circle cx="106" cy="36" r="12" fill="#68ddb2" stroke="#173f34" strokeWidth="2"/><path d="M100 36h12m-6-6v12" stroke="#16483d" strokeWidth="2.5" strokeLinecap="round"/></svg></button>}
 
         {entry.linkId && currentPlanetId && <div className="linked-route-actions"><button type="button" className="route-action-button" data-tooltip="Remove this item from all linked planets" aria-label={`Remove ${item?.name} from all linked planets`} onClick={()=>onChange(entries.filter(e=>e.id!==entry.id))}><RemoveRouteIcon both/></button><button type="button" className="route-action-button" data-tooltip="Remove only this side; keep the other planets’ items" aria-label={`Remove ${item?.name} only from this planet`} onClick={()=>updateWorkspace(current=>({...current,design:removeRouteSide(current.design,currentPlanetId,direction,entry.id)}))}><RemoveRouteIcon both={false}/></button></div>}
 

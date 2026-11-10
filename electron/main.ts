@@ -1,9 +1,8 @@
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Database } from './backend/database';
-import { Persistence } from './backend/persistence';
-import { validateWorkspace } from '../src/lib/workspace';
+import { Profiles } from './backend/profiles';
+import { validateWorkspace,type Workspace } from '../src/lib/workspace';
 import { autoUpdater } from 'electron-updater';
 import { createUpdates } from './backend/updates';
 import bundled from '../public/data/catalog.json';
@@ -20,12 +19,12 @@ function safeExternal(url: unknown) {
   try { const parsed=new URL(url); if(parsed.protocol==='https:'||parsed.protocol==='http:') return shell.openExternal(parsed.href); } catch { /* Ignore malformed external links. */ }
 }
 ipcMain.handle('open-external', (_event, url:unknown) => safeExternal(url));
-let persistence: Persistence | undefined;
+let persistence: Profiles | undefined;
 function storage() {
   if (!persistence) {
     const envFiles = [path.join(app.getPath('userData'), '.env'), ...(!app.isPackaged ? [path.join(app.getAppPath(), '.env')] : [])];
-    persistence = new Persistence(new Database(envFiles), path.join(app.getPath('userData'), 'cloud-workspace.json'), view => {
-      for (const window of BrowserWindow.getAllWindows()) window.webContents.send('workspace-changed', view);
+    persistence = new Profiles(envFiles,app.getPath('userData'),bundled as unknown as Catalog,view=>{
+      for (const window of BrowserWindow.getAllWindows()) window.webContents.send('workspace-changed',view);
     });
   }
   return persistence;
@@ -37,10 +36,14 @@ function trusted(event: Electron.IpcMainInvokeEvent) {
   if (url.startsWith('file:') && fileURLToPath(url) === path.join(__dirname, '../dist/index.html')) return;
   throw Error('Untrusted request.');
 }
-ipcMain.handle('workspace-load', async (event, legacy, recovery) => { trusted(event); try { return await storage().initialize(validateWorkspace(legacy), bundled as unknown as Catalog, recovery); } catch { throw Error('Could not open shared storage. Check the app .env and MongoDB network access. Local data is preserved.'); } });
+ipcMain.handle('workspace-load', async (event, legacy, recovery) => { trusted(event); try { return await storage().initialize(validateWorkspace(legacy), recovery); } catch { throw Error('Could not open shared storage. Check the app .env and MongoDB network access. Local data is preserved.'); } });
 ipcMain.handle('workspace-save', async (event, value, base) => { trusted(event); try { return await storage().save(value, base); } catch { throw Error('Workspace could not be saved locally.'); } });
 ipcMain.handle('workspace-sync', async event => { trusted(event); await storage().sync(); });
 ipcMain.handle('workspace-resolve', async (event, choice) => { trusted(event); if (choice !== 'local' && choice !== 'cloud') throw Error('Invalid choice.'); try { return await storage().resolve(choice); } catch { throw Error('Could not reach cloud storage.'); } });
+ipcMain.handle('profiles-list',async event=>{trusted(event);return storage().list();});
+ipcMain.handle('profile-switch',async(event,id:unknown,recovery?:{base:Workspace;data:Workspace})=>{trusted(event);return storage().switch(id,recovery);});
+ipcMain.handle('profile-create',async(event,name:unknown)=>{trusted(event);return storage().create(name);});
+ipcMain.handle('profile-rename',async(event,id:unknown,name:unknown)=>{trusted(event);return storage().rename(id,name);});
 let closing = false;
 app.on('before-quit', event => {
   if (!persistence || closing) return;

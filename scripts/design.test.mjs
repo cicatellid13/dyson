@@ -62,7 +62,8 @@ test('linked exports create one counterpart, sync both ways, move, and remove at
  data=updateTrades(data,b.id,'imports',find(b.id).imports.map(e=>({...e,amount:'240'})));
  assert.equal(find(a.id).exports[0].amount,'240');
  data=updateTrades(data,a.id,'exports',find(a.id).exports.map(e=>({...e,planetId:c.id})));
- assert.equal(find(b.id).imports.length,0);assert.equal(find(c.id).imports[0].amount,'240');
+ assert.equal(find(b.id).imports.length,0);assert.equal(find(c.id).imports.length,0);
+ data=linkExport(data,a.id,'route');assert.equal(find(c.id).imports[0].amount,'240');
  assert.deepEqual(parseDesign(JSON.stringify(data)),data);
  data=updateTrades(data,c.id,'imports',[]);assert.equal(find(a.id).exports.length,0);
 });
@@ -152,4 +153,27 @@ test('linking an export reuses an import serving the same system, including lega
  assert.equal(imports.length,1);
  assert.deepEqual(imports[0].planetIds,[one.id,two.id]);
  assert.ok(imports[0].systemIds.includes(system.id));
+});
+
+for(const direction of ['exports','imports'])test(`adding a planet to mapped ${direction} stays pending and maps only the new peer`,()=>{
+ const system=createSection('Sol','system'),a=createSection('A','planet',system.id),b=createSection('B','planet',system.id),c=createSection('C','planet',system.id);
+ const opposite=direction==='exports'?'imports':'exports';
+ a[direction]=[{id:'route',itemId:1303,amount:'120',unit:'items/min',destination:'',planetIds:[b.id]}];
+ let data=linkRoute({version:1,sections:[system,a,b,c]},a.id,direction,'route');
+ const find=id=>data.sections.find(s=>s.id===id);
+ const first=structuredClone(find(b.id)[opposite][0]);const firstLink=find(a.id)[direction][0].links[b.id];
+ data=updateTrades(data,a.id,direction,find(a.id)[direction].map(e=>({...e,planetIds:[b.id,c.id]})));
+ assert.equal(find(c.id)[opposite].length,0);
+ assert.deepEqual(find(b.id)[opposite],[first]);
+ assert.deepEqual(find(a.id)[direction][0].links,{[b.id]:firstLink});
+ assert.equal(routeReadiness(data.sections,a.id,direction,find(a.id)[direction][0]).ready,false);
+ // Editing the rate must also leave the new planet pending.
+ data=updateTrades(data,a.id,direction,find(a.id)[direction].map(e=>({...e,amount:'240'})));
+ assert.equal(find(c.id)[opposite].length,0);
+ data=linkRoute(data,a.id,direction,'route');
+ assert.equal(find(b.id)[opposite].length,1);assert.equal(find(b.id)[opposite][0].id,first.id);
+ assert.equal(find(a.id)[direction][0].links[b.id],firstLink);
+ assert.equal(find(c.id)[opposite].length,1);assert.equal(find(c.id)[opposite][0].amount,'240');
+ assert.equal(routeReadiness(data.sections,a.id,direction,find(a.id)[direction][0]).ready,true);
+ assert.deepEqual(linkRoute(data,a.id,direction,'route'),data);
 });

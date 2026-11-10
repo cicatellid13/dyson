@@ -8,6 +8,10 @@ contextBridge.exposeInMainWorld('dspWiki', {
     ipcRenderer.on('update-state', listener);
     return () => ipcRenderer.removeListener('update-state', listener);
   },
+  listProfiles: () => ipcRenderer.invoke('profiles-list'),
+  switchProfile: (id:string,recovery?:unknown) => ipcRenderer.invoke('profile-switch',id,recovery),
+  createProfile: (name:string) => ipcRenderer.invoke('profile-create',name),
+  renameProfile: (id:string,name:string) => ipcRenderer.invoke('profile-rename',id,name),
   loadWorkspace: (legacy: unknown, recovery: unknown) => ipcRenderer.invoke('workspace-load', legacy, recovery),
   saveWorkspace: (data: unknown, base: unknown) => ipcRenderer.invoke('workspace-save', data, base),
   syncWorkspace: () => ipcRenderer.invoke('workspace-sync'),

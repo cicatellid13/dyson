@@ -121,10 +121,9 @@ export function updateTrades(data:DesignData,ownerId:string,direction:'imports'|
    sections=sections.map(s=>{const updated={...s};for(const side of ['imports','exports'] as const)updated[side]=s[side].map(e=>{const edges=Object.values(routeLinks(e));if(!edges.includes(link))return e;pending.push(...edges.filter(id=>!seen.has(id)));return {...e,itemId:next.itemId,amount:next.amount,unit:next.unit};});return updated;});
   }
  }
- let result={...data,sections};
- // Adding peers to an already-linked row keeps automatic linking active.
- for(const old of owner[direction])if(Object.keys(routeLinks(old)).length&&entries.some(e=>e.id===old.id))result=linkRoute(result,ownerId,direction,old.id);
- return result;
+ // Selecting a new peer leaves it pending until the user explicitly maps it.
+ // Existing link IDs stay intact so mapping only visits the newly selected planets.
+ return {...data,sections};
 }
 export function linkExport(data:DesignData,ownerId:string,entryId:string):DesignData{return linkRoute(data,ownerId,'exports',entryId);}
 export function linkRoute(data:DesignData,ownerId:string,direction:'imports'|'exports',entryId:string):DesignData {
