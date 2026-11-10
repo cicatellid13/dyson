@@ -1,10 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { overviewParagraphs, type Item } from '../lib/catalog';
 import { openInBrowser } from '../lib/wikiLinks';
+import { useSessionSelection } from '../lib/sessionExpansion';
 import { useItemAccess } from './ItemAccess';
 
 export function ItemOverview({ item, items }: { item: Item; items: Map<number, Item> }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expansion,setExpansion] = useSessionSelection(`catalog-overview-${item.id}`);
+  const expanded = expansion === 'open';
+  const setExpanded = (change:(previous:boolean)=>boolean) => setExpansion(change(expanded)?'open':null);
   const [overflow, setOverflow] = useState(false);
   const content = useRef<HTMLDivElement>(null);
   const actions = useItemAccess();

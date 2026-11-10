@@ -6,6 +6,52 @@ const compiled=ts.transpileModule(readFileSync(new URL('../src/lib/catalog.ts',i
 const {pairs,recipesFor,batchesFor,catalogForDarkFog,isDefenseItem,overviewParagraphs}=await import('data:text/javascript;base64,'+Buffer.from(compiled).toString('base64'));
 const c=JSON.parse(readFileSync(new URL('../public/data/catalog.json',import.meta.url),'utf8'));
 const ids=new Set(c.items.map(i=>i.id));
+const pinnedCompiled=ts.transpileModule(readFileSync(new URL('../src/lib/pinnedItems.ts',import.meta.url),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;
+const {addPinnedItem,normalizePinnedItems,movePinnedItem,loadPinnedItems,locationPinId,parseLocationPin,pinToken,resolvePinnedEntries}=await import('data:text/javascript;base64,'+Buffer.from(pinnedCompiled).toString('base64'));
+test('pinned items recover safely from malformed device storage and keep a unique order',()=>{
+ assert.deepEqual(normalizePinnedItems([1303,1101,1303,'1102',null,-1,0,1.5]),[1303,1101]);
+ assert.deepEqual(normalizePinnedItems({ids:[1303]}),[]);
+ const previous=globalThis.localStorage;
+ try{
+  globalThis.localStorage={getItem:()=>JSON.stringify([1303,1101,1303])};
+  assert.deepEqual(loadPinnedItems(),[1303,1101]);
+  globalThis.localStorage={getItem:()=>'{corrupt'};assert.deepEqual(loadPinnedItems(),[]);
+  globalThis.localStorage={getItem:()=>{throw Error('Unavailable');}};assert.deepEqual(loadPinnedItems(),[]);
+ }finally{if(previous===undefined)delete globalThis.localStorage;else globalThis.localStorage=previous;}
+});
+test('mixed item and location pins preserve legacy pins and resolve current names by stable ID',()=>{
+ const system={id:'s1',kind:'system',parentId:null,name:'Sadira'};
+ const planet={id:'p1',kind:'planet',parentId:'s1',name:'IV'};
+ const item={id:1303,name:'Processor',icon:'icons/1303.png'};
+ const pins=normalizePinnedItems([1303,'planet:p1','system:s1',1303,'planet:p1','planet:','unknown:s1']);
+ assert.deepEqual(pins,[1303,'planet:p1','system:s1']);
+ assert.notEqual(pinToken(1303),pinToken('planet:1303'));
+ assert.equal(locationPinId('planet','p1'),'planet:p1');
+ assert.deepEqual(parseLocationPin('system:s1'),{kind:'system',id:'s1'});
+ assert.equal(parseLocationPin(1303),null);
+ assert.deepEqual(resolvePinnedEntries(pins,[item],[system,planet]).map(entry=>[entry.kind,entry.name]),[['item','Processor'],['planet','Sadira/IV'],['system','Sadira']]);
+ assert.equal(resolvePinnedEntries(['planet:p1'],[],[{...system,name:'Renamed'},planet])[0].name,'Renamed/IV');
+ assert.deepEqual(resolvePinnedEntries(pins,[],[system]).map(entry=>entry.id),['system:s1']);
+ assert.equal(resolvePinnedEntries(['planet:p1'],[],[{...planet,parentId:null}])[0].name,'Unassigned system/IV');
+ assert.deepEqual(movePinnedItem(pins,'system:s1',1303),['system:s1',1303,'planet:p1']);
+ assert.deepEqual(addPinnedItem(pins,'system:s1'),pins);
+});
+test('dropping an item pins it once and preserves existing pin order',()=>{
+ const pins=[1303,1101];
+ assert.deepEqual(addPinnedItem(pins,1102),[1303,1101,1102]);
+ assert.deepEqual(addPinnedItem(pins,1303),[1303,1101]);
+ assert.deepEqual(addPinnedItem([],1303),[1303]);
+ assert.deepEqual(pins,[1303,1101]);
+});
+test('reordering pins preserves every item without mutating the stored order',()=>{
+ const pins=[1303,1101,1102];
+ assert.deepEqual(movePinnedItem(pins,1303,1102),[1101,1102,1303]);
+ assert.deepEqual(movePinnedItem(pins,1102,1303),[1102,1303,1101]);
+ assert.deepEqual(movePinnedItem(pins,9999,1303),pins);
+ assert.deepEqual(movePinnedItem(pins,1303,9999),pins);
+ assert.deepEqual(movePinnedItem(pins,1303,1303),pins);
+ assert.deepEqual(pins,[1303,1101,1102]);
+});
 test('all enabled items have a bundled image with a valid file signature',()=>{
  assert.ok(c.items.length>150);assert.equal(ids.size,c.items.length);
  for(const i of c.items){assert.ok(i.icon,i.name);const p=new URL('../public/'+i.icon,import.meta.url);assert.ok(existsSync(p),i.name);const b=readFileSync(p);assert.ok(b.subarray(0,4).equals(Buffer.from([137,80,78,71]))||b.subarray(0,4).toString()==='RIFF'||b.subarray(0,2).equals(Buffer.from([255,216])),i.name);}

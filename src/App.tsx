@@ -1,3 +1,5 @@
+import { PinnedItemStrip, PinItemButton } from './components/PinnedItemStrip';
+import { addPinnedItem, loadPinnedItems, locationPinId, parseLocationPin, resolvePinnedEntries, movePinnedItem, PINNED_ITEMS_KEY, type PinId } from './lib/pinnedItems';
 import { RecipePreview } from './components/RecipePreview';
 import { UpdateControl } from './components/UpdateControl';
 import {NetworkButton,NetworkSearch,type NetworkRequest} from './components/NetworkSearch';
@@ -14,7 +16,7 @@ import '@fontsource/orbitron/600.css';
 import { Planning } from './components/Planning';
 import { undoRemoval, dismissRemoval, initializePersistence, useWorkspace, updateWorkspace, resolveWorkspace, retrySync } from './lib/persistence';
 import { CategoryIcon } from './components/CategoryIcon';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { batchesFor, pairs, recipesFor, isDefenseItem, catalogForDarkFog, type Catalog, type Item } from './lib/catalog';
 import snapshot from '../public/data/catalog.json';
 import { Design } from './components/Design';
@@ -28,9 +30,14 @@ function Icon({item,large=false,count}:{item?:Item;large?:boolean;count?:number}
 function ExpandableInput({ catalog, itemMap, id, count, path, onItemDrag }: {
   catalog: Catalog; itemMap: Map<number, Item>; id: number; count: number; path: number[]; onItemDrag: (id: number | null) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const stateKey = `catalog-input-${path.join('/')}-${id}`;
+  const [expansion,setExpansion] = useSessionSelection(stateKey);
+  const open = expansion === 'open';
+  const setOpen = (change:(previous:boolean)=>boolean) => setExpansion(change(open)?'open':null);
   const itemActions=useItemAccess();
-  const [chosenRecipe, setChosenRecipe] = useState<number | null>(null);
+  const [recipeChoice,setRecipeChoice] = useSessionSelection(`${stateKey}-recipe`);
+  const chosenRecipe = recipeChoice === null ? null : Number(recipeChoice);
+  const setChosenRecipe = (value:number) => setRecipeChoice(String(value));
   const item = itemMap.get(id);
   const options = recipesFor(catalog, id);
   const recipe = options.find(r => r.id === chosenRecipe) ?? options[0];
@@ -64,20 +71,21 @@ function ExpandableInput({ catalog, itemMap, id, count, path, onItemDrag }: {
 }
 
 export function App(){
- useDelayedDragCursor(() => setDraggedItem(null));
+ useDelayedDragCursor(() => {setDraggedItem(null);setDraggedLocation(null);});
 
 
  const [query,setQuery]=useState('');
  const [favoriteSearch,setFavoriteSearch]=useState('');
- const [,setTodoOverview]=useSessionSelection('network-todo-overview');const [,setLocation]=useSessionSelection('logistics-location');const [,setGraph]=useSessionSelection('logistics-graph');const [,setSystemsExpanded]=useSessionExpansion('logistics-systems');
+ const [networkOverview,setTodoOverview]=useSessionSelection('network-todo-overview');const [activeLocation,setLocation]=useSessionSelection('logistics-location');const [,setGraph]=useSessionSelection('logistics-graph');const [,setSystemsExpanded]=useSessionExpansion('logistics-systems');
  const [networkRequest,setNetworkRequest]=useState<NetworkRequest|null>(null);const [,setEntriesExpanded]=useSessionExpansion('logistics-entries');const [,setFactoryPlanet]=useSessionSelection('logistics-factory-planet');const [,setFactoryFocus]=useSessionSelection('logistics-factory-focus');const [,setNetworkFocus]=useSessionSelection('logistics-network-focus');
  function openPlanet(id:string,entryId?:string,factoryId?:string){const planet=cloud.view.data.design.sections.find(s=>s.id===id&&s.kind==='planet');if(!planet)return;setTodoOverview(null);setLocation(id);setGraph(null);setNetworkFocus(JSON.stringify({entryId,factoryId,nonce:crypto.randomUUID()}));if(entryId)setEntriesExpanded(old=>new Set([...old,entryId]));if(factoryId){setFactoryPlanet(id);setFactoryFocus(factoryId);}if(planet.parentId)setSystemsExpanded(old=>new Set([...old,planet.parentId!]));selectCategory('Logistics Network');}
  const [plannerRequest,setPlannerRequest]=useState<{id:number;sequence:number;saved?:SavedFactory;planetId?:string}>();
  function planItem(id:number,saved?:SavedFactory,planetId?:string){setPlannerRequest(previous=>({id,saved,planetId,sequence:(previous?.sequence??0)+1}));setCategory('Factory Planner');}
  const [draggedItem,setDraggedItem]=useState<number|null>(null);
+ const [draggedLocation,setDraggedLocation]=useState<string|null>(null);
  const [favoriteDropTarget,setFavoriteDropTarget]=useState<string|null>(null);
  const [favoriteNotice,setFavoriteNotice]=useState('');
- useEffect(()=>{ if(draggedItem===null)setFavoriteDropTarget(null); },[draggedItem]);
+ useEffect(()=>{ if(draggedItem===null&&draggedLocation===null)setFavoriteDropTarget(null); },[draggedItem,draggedLocation]);
  useEffect(()=>{ if(!favoriteNotice)return; const timer=setTimeout(()=>setFavoriteNotice(''),3500); return ()=>clearTimeout(timer); },[favoriteNotice]);
  const [category,setCategory]=useState('All items');
  const [categoriesExpanded,setCategoriesExpanded]=useState(false);
@@ -92,6 +100,7 @@ export function App(){
  const darkFog=cloud.view.data.darkFog;
  const favorites=cloud.view.data.favorites;
  function toggleDarkFog(){
+  rememberItemView();
   const next=!darkFog;
   if(!next&&['Turrets','Defense','Dark Fog'].includes(category))setCategory('All items');
   updateWorkspace(data=>({...data,darkFog:next}));
@@ -103,6 +112,35 @@ export function App(){
  const [recipeId,setRecipeId]=useState<number|null>(null);
  const [quantity,setQuantity]=useState(1);
  const [tab,setTab]=useState<'recipe'|'chain'>('recipe');
+ const [pinnedItems,setPinnedItems]=useState(loadPinnedItems);
+ const detailRef=useRef<HTMLElement|null>(null);
+ const itemViews=useRef(new Map<number,{recipeId:number|null;quantity:number;tab:'recipe'|'chain';scroll:number}>());
+ const [chainExpansion,setChainExpansion]=useSessionExpansion('catalog-chain-expansion');
+ useEffect(()=>{try{localStorage.setItem(PINNED_ITEMS_KEY,JSON.stringify(pinnedItems));}catch{/* Pins still work for this session. */}},[pinnedItems]);
+ function rememberItemView(){
+  itemViews.current.set(selected,{recipeId,quantity,tab,scroll:detailRef.current?.scrollTop??itemViews.current.get(selected)?.scroll??0});
+ }
+ function chooseItem(id:number){
+  if(id===selected)return;
+  rememberItemView();
+  const view=itemViews.current.get(id);
+  setSelected(id);setRecipeId(view?.recipeId??null);setQuantity(view?.quantity??1);setTab(view?.tab??'recipe');
+ }
+ function togglePinned(id:number){setPinnedItems(previous=>previous.includes(id)?previous.filter(value=>value!==id):[...previous,id]);}
+ function openPinned(id:PinId){
+  if(typeof id==='string'){
+   const target=parseLocationPin(id);
+   const section=cloud.view.data.design.sections.find(section=>section.id===target?.id&&section.kind===target.kind);
+   if(!section)return;
+   rememberItemView();setTodoOverview(null);setLocation(section.id);setGraph(null);setNetworkFocus(null);
+   if(section.parentId)setSystemsExpanded(previous=>new Set([...previous,section.parentId!]));
+   setCategory('Logistics Network');return;
+  }
+  if(!itemMap.has(id))return;
+  chooseItem(id);setCategory('All items');setQuery('');setHistory([]);setGridDetail(catalogView==='grid');setGridOrigin(catalogView==='grid');
+ }
+ useLayoutEffect(()=>{if(detailRef.current)detailRef.current.scrollTop=itemViews.current.get(selected)?.scroll??0;},[selected,category,gridDetail,gridView]);
+
 
  const itemMap=useMemo(()=>new Map(catalog?.items.map(i=>[i.id,i])),[catalog]);
  useEffect(()=>{
@@ -115,29 +153,36 @@ export function App(){
  const batches=recipe?batchesFor(recipe,selected,quantity):0;
  function navigate(id:number){
   if(!itemMap.has(id))return;
-  if(gridView){setSelected(id);setRecipeId(null);setQuantity(1);setHistory([]);setGridOrigin(true);setGridDetail(true);return;}
+  if(gridView){chooseItem(id);setHistory([]);setGridOrigin(true);setGridDetail(true);return;}
   const external=category==='Logistics Network'||category==='Scratch Pad'||category==='Factory Planner';
   if(external||id!==selected)setHistory(h=>[...h,{id:selected,category,detail:gridDetail,gridOrigin}]);
   if(external){setCategory('All items');setQuery('');setGridDetail(true);setGridOrigin(false);}
   if(category==='Favorites'){setFavoriteSelected(id);setFavoriteSearch(itemMap.get(id)?.name??'');}
-  setSelected(id);setRecipeId(null);setQuantity(1);
+  chooseItem(id);
  }
  function goBack(){
   const previous=history[history.length-1];if(!previous)return;
-  setHistory(h=>h.slice(0,-1));setCategory(previous.category);setGridDetail(previous.detail);setGridOrigin(previous.gridOrigin);setSelected(previous.id);setRecipeId(null);setQuantity(1);
+  setHistory(h=>h.slice(0,-1));setCategory(previous.category);setGridDetail(previous.detail);setGridOrigin(previous.gridOrigin);chooseItem(previous.id);
   if(previous.category==='Favorites')setFavoriteSelected(previous.id);
  }
- function returnToGrid(){setCategory('All items');setGridDetail(false);setGridOrigin(false);setHistory([]);setViewOverride('grid');}
+ function returnToGrid(){rememberItemView();setCategory('All items');setGridDetail(false);setGridOrigin(false);setHistory([]);setViewOverride('grid');}
 
  function favorite(){updateWorkspace(data=>({...data,favorites:data.favorites.includes(selected)?data.favorites.filter(id=>id!==selected):[...data.favorites,selected]}));}
- function itemDropProps(target:string, destination:'Favorites'|'Factory Planner'='Favorites') {
+ function itemDropProps(target:string, destination:'Favorites'|'Factory Planner'|'Pinned items'='Favorites') {
   return {
-   onDragOver:(event:React.DragEvent)=>{ if(draggedItem===null || !itemMap.has(draggedItem) || !event.dataTransfer.types.includes('application/x-dsp-item'))return; event.preventDefault(); event.dataTransfer.dropEffect='copy'; setFavoriteDropTarget(target); },
+   onDragOver:(event:React.DragEvent)=>{ if(destination==='Pinned items'&&draggedLocation&&event.dataTransfer.types.includes('application/x-dsp-location')){event.preventDefault();event.dataTransfer.dropEffect='copy';setFavoriteDropTarget(target);return;} if(draggedItem===null || !itemMap.has(draggedItem) || !event.dataTransfer.types.includes('application/x-dsp-item'))return; event.preventDefault(); event.dataTransfer.dropEffect='copy'; setFavoriteDropTarget(target); },
    onDragLeave:(event:React.DragEvent)=>{ if(!event.currentTarget.contains(event.relatedTarget as Node|null))setFavoriteDropTarget(null); },
    onDrop:(event:React.DragEvent)=>{
-    event.preventDefault(); const id=Number(event.dataTransfer.getData('application/x-dsp-item'));
+    event.preventDefault();
+    if(destination==='Pinned items'&&draggedLocation){
+     const key=event.dataTransfer.getData('application/x-dsp-location');
+     if(key===draggedLocation&&cloud.view.data.design.sections.some(section=>locationPinId(section.kind,section.id)===key))setPinnedItems(previous=>addPinnedItem(previous,key));
+     setDraggedLocation(null);setFavoriteDropTarget(null);return;
+    }
+    const id=Number(event.dataTransfer.getData('application/x-dsp-item'));
     if(draggedItem!==null && id===draggedItem && itemMap.has(id)) {
      if(destination==='Factory Planner') planItem(id);
+     else if(destination==='Pinned items')setPinnedItems(previous=>addPinnedItem(previous,id));
      else {
      updateWorkspace(data=>data.favorites.includes(id)?data:{...data,favorites:[...data.favorites,id]});
      setFavoriteNotice(`${itemMap.get(id)!.name} ${favorites.includes(id)?'is already in':'added to'} Favorites`);
@@ -153,7 +198,7 @@ export function App(){
   onDragOver:(event:React.DragEvent)=>{if(draggedItem!==null && favorites.includes(draggedItem)){event.preventDefault();event.stopPropagation();event.dataTransfer.dropEffect='move';setFavoriteDropTarget(`row-${target}`);}},
   onDrop:(event:React.DragEvent)=>{if(draggedItem===null || !favorites.includes(draggedItem))return;event.preventDefault();event.stopPropagation();const source=draggedItem;updateWorkspace(data=>{const order=[...data.favorites];const from=order.indexOf(source),to=order.indexOf(target);if(from<0||to<0)return data;order.splice(from,1);order.splice(to,0,source);return {...data,favorites:order};});setDraggedItem(null);setFavoriteDropTarget(null);}
  };}
- function selectCategory(next:string){setHistory([]);setGridOrigin(false);setGridDetail(false);setViewOverride(null);setQuery('');setCategory(next);if(next==='Favorites'){if(favoriteSelected!==null&&favorites.includes(favoriteSelected))setSelected(favoriteSelected);else setFavoriteSelected(null);setHistory([]);}}
+ function selectCategory(next:string){rememberItemView();setHistory([]);setGridOrigin(false);setGridDetail(false);setViewOverride(null);setQuery('');setCategory(next);if(next==='Favorites'){if(favoriteSelected!==null&&favorites.includes(favoriteSelected))chooseItem(favoriteSelected);else setFavoriteSelected(null);setHistory([]);}}
  const categories=['All items','Favorites','Logistics Network','Factory Planner','Scratch Pad','Buildings',...Object.values(catalog?.categories??{}).filter(c=>c!=='Unknown Category'&&(darkFog||!['Turrets','Defense','Dark Fog'].includes(c)))];
  const searchPlaceholders:Record<string,string>={
   'All items':'Find an item or building…',
@@ -179,8 +224,12 @@ export function App(){
   const target=itemMap.get(id);const cycle=path.includes(id);const r=depth===0?recipe:catalog&&recipesFor(catalog,id)[0];
   if(cycle||!r||depth>=8)return <div className="tree-leaf">{chip(id,count)}<small>{cycle?'Cycle — supply this ingredient separately':depth>=8?'Depth limit — open item to continue':target?.mining_from??'Gather / supply directly'}</small></div>;
   const b=batchesFor(r,id,count);
-  return <details className="tree-node" open={depth<2} key={`${id}-${depth}`}><summary {...itemDragProps(id)} className={isDefenseItem(target)?'defense-item':''}><button className="ingredient-name" onClick={event=>{event.preventDefault();event.stopPropagation();navigate(id);}}><Icon item={target} count={count}/><strong>{target?.name}</strong></button><small>{b} batch{b!==1?'es':''} · {r.seconds*b}s</small><ItemJump id={id} name={target?.name}/></summary><div>{pairs(r.inputs).map(p=><div key={p.id}>{tree(p.id,p.count*b,[...path,id],depth+1)}</div>)}</div></details>;
+  const expansionKey=`${selected}/${path.join('/')}/${id}`;
+  const expanded=chainExpansion.has(`open:${expansionKey}`)||depth<2&&!chainExpansion.has(`closed:${expansionKey}`);
+  return <details className="tree-node" open={expanded} onToggle={event=>{const open=event.currentTarget.open;if(open===expanded)return;setChainExpansion(previous=>{const next=new Set(previous);next.delete(`open:${expansionKey}`);next.delete(`closed:${expansionKey}`);next.add(`${open?'open':'closed'}:${expansionKey}`);return next;});}} key={`${id}-${depth}`}><summary {...itemDragProps(id)} className={isDefenseItem(target)?'defense-item':''}><button className="ingredient-name" onClick={event=>{event.preventDefault();event.stopPropagation();navigate(id);}}><Icon item={target} count={count}/><strong>{target?.name}</strong></button><small>{b} batch{b!==1?'es':''} · {r.seconds*b}s</small><ItemJump id={id} name={target?.name}/></summary><div>{pairs(r.inputs).map(p=><div key={p.id}>{tree(p.id,p.count*b,[...path,id],depth+1)}</div>)}</div></details>;
  }
+ const pinnedEntries=resolvePinnedEntries(pinnedItems,catalog.items,cloud.view.data.design.sections);
+ const activePinnedLocation=category==='Logistics Network'&&!networkOverview?cloud.view.data.design.sections.find(section=>section.id===activeLocation):undefined;
  if(!cloud.ready)return <div className="boot"><h1>DSP Toolkit</h1><p>{cloud.error || 'Opening your shared workspace…'}</p>{cloud.error && <button onClick={()=>{void initializePersistence();}}>Retry connection</button>}</div>;
  function sidebarCategory(c:string){return <button className={`${category===c?'nav active':'nav'} ${(c==='Favorites'||c==='Factory Planner') && draggedItem!==null?'favorite-drop-ready':''} ${(c==='Favorites'||c==='Factory Planner') && favoriteDropTarget===c?'favorite-drop-active':''}`} {...((c==='Favorites'||c==='Factory Planner')?itemDropProps(c,c):{})} key={c} onClick={()=>selectCategory(c)}><span>{c==='All items'?'▦':c==='Favorites'?'☆':c==='Buildings'?'▤':<CategoryIcon category={c}/>}</span>{c}<small>{c==='All items'?catalog.items.length:c==='Favorites'?favorites.filter(id=>itemMap.has(id)).length:''}</small></button>;}
  return <ItemAccessContext.Provider value={{navigate,planet:openPlanet,network:(id,consumer)=>setNetworkRequest({id,consumer}),plan:planItem,drag:setDraggedItem}}><div className="app-shell dark-fog-normal"><RecipePreview catalog={catalog}/>{networkRequest&&<NetworkSearch key={networkRequest.id} request={networkRequest} catalog={catalog} onClose={()=>setNetworkRequest(null)}/>}{cloud.undoLabel&&<div className="removal-undo" role="status"><span>{cloud.undoError??cloud.undoLabel}</span><button onClick={undoRemoval}>Undo</button><button aria-label="Dismiss undo" onClick={dismissRemoval}>×</button></div>}
@@ -189,12 +238,13 @@ export function App(){
    <img className="sphere-galaxy" src={`${import.meta.env.BASE_URL}art/galaxy-header.png`} alt="Panoramic galaxy surrounding a brilliant golden star with orbital collectors for a Dyson sphere"/>
    <div className="sphere-title"><span className="twinkling-star" aria-hidden="true">✦</span><h1>Dysons Sphere</h1></div>
  </section>
+ <PinnedItemStrip acceptingItems={draggedLocation!==null||draggedItem!==null&&itemMap.has(draggedItem)} dropActive={favoriteDropTarget==='pinned-strip'} dropProps={itemDropProps('pinned-strip','Pinned items')} items={pinnedEntries} active={activePinnedLocation?locationPinId(activePinnedLocation.kind,activePinnedLocation.id):!['Logistics Network','Scratch Pad','Factory Planner'].includes(category)&&(!gridView||gridDetail)&&item?selected:null} onSelect={openPinned} onClose={id=>setPinnedItems(previous=>previous.filter(value=>value!==id))} onReorder={(source,target)=>setPinnedItems(previous=>movePinnedItem(previous,source,target))}/>
  {error&&<div className="error" role="alert">{error}<button onClick={()=>updateWorkspace(data=>data)}>Retry saving</button></div>}
  {cloud.view.message && <div className="sync-banner" role="status">{cloud.view.message}{cloud.view.status==='conflict'?<><button onClick={()=>{void resolveWorkspace('cloud');}}>Use cloud version</button><button onClick={()=>{void resolveWorkspace('local');}}>Keep this device’s version</button></>:<button onClick={()=>{void retrySync();}}>Retry sync</button>}</div>}
  <div className={`factory-planner-session ${draggedItem!==null?'favorite-drop-ready':''} ${favoriteDropTarget==='planner-pane'?'favorite-drop-active':''}`} {...itemDropProps('planner-pane','Factory Planner')} hidden={category!=='Factory Planner'}><FactoryPlanner catalog={catalog} request={plannerRequest}/></div>
- {category==='Logistics Network'?<Design catalog={catalog}/>:category==='Scratch Pad'?<Planning/>:category==='Factory Planner'?null:<div className={`browser-layout ${gridView||gridDetail?'grid-browser':''}`}>{!gridDetail&&<section className={`catalog-panel ${category==='Favorites' && draggedItem!==null?'favorite-drop-ready':''} ${favoriteDropTarget==='pane'?'favorite-drop-active':''}`} {...(category==='Favorites'?itemDropProps('pane'):{})}><div className="catalog-tools">{category==='Favorites'?<div className="favorites-picker"><ItemPicker items={catalog.items.filter(i=>favorites.includes(i.id))} value={favoriteSearch} onChange={value=>{setFavoriteSearch(value);const chosen=catalog.items.find(i=>favorites.includes(i.id)&&i.name.toLowerCase()===value.trim().toLowerCase());if(chosen)navigate(chosen.id);}} label="Favorite item"/></div>:<label className="search"><span>⌕</span><input type="search" aria-label={`Search ${category.toLowerCase()}`} placeholder={searchPlaceholder} value={query} onChange={e=>setQuery(e.target.value)}/><kbd>⌕</kbd></label>}<div className="list-heading"><h2>{category}</h2><span>{visible.length} items</span></div></div>{category==='All items'&&<div className="catalog-view-controls"><div role="group" aria-label="Catalog view"><button aria-pressed={catalogView==='list'} onClick={()=>setViewOverride('list')}>☰ List</button><button aria-pressed={catalogView==='grid'} onClick={()=>setViewOverride('grid')}>▦ Grid</button></div><label><input type="checkbox" checked={(cloud.view.data.defaultCatalogView??'list')==='grid'} onChange={event=>updateWorkspace(data=>({...data,defaultCatalogView:event.target.checked?'grid':'list'}))}/>Default to grid</label></div>}{gridView?<CatalogGrid items={visible} onSelect={id=>{setSelected(id);setRecipeId(null);setQuantity(1);setHistory([]);setGridOrigin(true);setGridDetail(true);}}/>:<div className="item-list">{visible.map(i=>category==='Favorites'?<div key={i.id} className={`item-row favorite-item-row ${favoriteSelected===i.id?'selected':''} ${favoriteDropTarget===`row-${i.id}`?'favorite-drop-active':''}`} {...itemDragProps(i.id)} {...favoriteReorderProps(i.id)} onClick={event=>{if(event.target instanceof Element && !event.target.closest('button,a,input'))navigate(i.id);}}><button className="favorite-item-open" data-preview-id={i.id} onClick={()=>navigate(i.id)}><Icon item={i}/><span><strong>{i.name}</strong><small>{catalog.categories[i.type]??i.type}</small></span></button><ItemJump id={i.id} name={i.name}/><button className="favorite-remove" aria-label={`Remove ${i.name} from Favorites`} data-tooltip="Remove from Favorites" onClick={()=>{updateWorkspace(data=>({...data,favorites:data.favorites.filter(id=>id!==i.id)}));if(favoriteSelected===i.id)setFavoriteSelected(null);if(favoriteSearch===i.name)setFavoriteSearch('');}}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>:<div key={i.id} className={`item-row ${selected===i.id?'selected':''} ${isDefenseItem(i)?'defense-item':''}`} {...itemDragProps(i.id)} onClick={event=>{if(event.target instanceof Element && !event.target.closest('button,a,input'))navigate(i.id);}}><button className="favorite-item-open" data-preview-id={i.id} onClick={()=>navigate(i.id)}><Icon item={i}/><span><strong>{i.name}</strong><small>{catalog.categories[i.type]??i.type}</small></span></button><ItemJump id={i.id} name={i.name}/><button className={`list-favorite ${favorites.includes(i.id)?'saved':''}`} aria-label={`${favorites.includes(i.id)?'Remove':'Add'} ${i.name} ${favorites.includes(i.id)?'from':'to'} Favorites`} aria-pressed={favorites.includes(i.id)} data-tooltip={favorites.includes(i.id)?'Remove from Favorites':'Add to Favorites'} onClick={()=>updateWorkspace(data=>({...data,favorites:data.favorites.includes(i.id)?data.favorites.filter(id=>id!==i.id):[...data.favorites,i.id]}))}><svg width="18" height="18" viewBox="0 0 24 24" fill={favorites.includes(i.id)?'currentColor':'none'} stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" aria-hidden="true"><path d="m12 2.5 2.9 6 6.6.9-4.8 4.7 1.2 6.6-5.9-3.1-5.9 3.1 1.2-6.6L2.5 9.4l6.6-.9Z"/></svg></button></div>)}{!visible.length&&<div className="empty"><h3>No items here yet</h3><p>{category==='Favorites'?'Star an item or drag a required input here.':'Try a different name or category.'}</p><button onClick={()=>{setQuery('');setCategory('All items');}}>Show all items</button></div>}</div>}</section>}
+ {category==='Logistics Network'?<Design catalog={catalog} onLocationDrag={setDraggedLocation} pinnedLocations={pinnedItems.filter((id):id is string=>typeof id==='string')} onTogglePin={(kind,id)=>{const key=locationPinId(kind,id);setPinnedItems(previous=>previous.includes(key)?previous.filter(value=>value!==key):addPinnedItem(previous,key));}}/>:category==='Scratch Pad'?<Planning/>:category==='Factory Planner'?null:<div className={`browser-layout ${gridView||gridDetail?'grid-browser':''}`}>{!gridDetail&&<section className={`catalog-panel ${category==='Favorites' && draggedItem!==null?'favorite-drop-ready':''} ${favoriteDropTarget==='pane'?'favorite-drop-active':''}`} {...(category==='Favorites'?itemDropProps('pane'):{})}><div className="catalog-tools">{category==='Favorites'?<div className="favorites-picker"><ItemPicker items={catalog.items.filter(i=>favorites.includes(i.id))} value={favoriteSearch} onChange={value=>{setFavoriteSearch(value);const chosen=catalog.items.find(i=>favorites.includes(i.id)&&i.name.toLowerCase()===value.trim().toLowerCase());if(chosen)navigate(chosen.id);}} label="Favorite item"/></div>:<label className="search"><span>⌕</span><input type="search" aria-label={`Search ${category.toLowerCase()}`} placeholder={searchPlaceholder} value={query} onChange={e=>setQuery(e.target.value)}/><kbd>⌕</kbd></label>}<div className="list-heading"><h2>{category}</h2><span>{visible.length} items</span></div></div>{category==='All items'&&<div className="catalog-view-controls"><div role="group" aria-label="Catalog view"><button aria-pressed={catalogView==='list'} onClick={()=>setViewOverride('list')}>☰ List</button><button aria-pressed={catalogView==='grid'} onClick={()=>setViewOverride('grid')}>▦ Grid</button></div><label><input type="checkbox" checked={(cloud.view.data.defaultCatalogView??'list')==='grid'} onChange={event=>updateWorkspace(data=>({...data,defaultCatalogView:event.target.checked?'grid':'list'}))}/>Default to grid</label></div>}{gridView?<CatalogGrid items={visible} onSelect={id=>{chooseItem(id);setHistory([]);setGridOrigin(true);setGridDetail(true);}}/>:<div className="item-list">{visible.map(i=>category==='Favorites'?<div key={i.id} className={`item-row favorite-item-row ${favoriteSelected===i.id?'selected':''} ${favoriteDropTarget===`row-${i.id}`?'favorite-drop-active':''}`} {...itemDragProps(i.id)} {...favoriteReorderProps(i.id)} onClick={event=>{if(event.target instanceof Element && !event.target.closest('button,a,input'))navigate(i.id);}}><button className="favorite-item-open" data-preview-id={i.id} onClick={()=>navigate(i.id)}><Icon item={i}/><span><strong>{i.name}</strong><small>{catalog.categories[i.type]??i.type}</small></span></button><ItemJump id={i.id} name={i.name}/><button className="favorite-remove" aria-label={`Remove ${i.name} from Favorites`} data-tooltip="Remove from Favorites" onClick={()=>{updateWorkspace(data=>({...data,favorites:data.favorites.filter(id=>id!==i.id)}));if(favoriteSelected===i.id)setFavoriteSelected(null);if(favoriteSearch===i.name)setFavoriteSearch('');}}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>:<div key={i.id} className={`item-row ${selected===i.id?'selected':''} ${isDefenseItem(i)?'defense-item':''}`} {...itemDragProps(i.id)} onClick={event=>{if(event.target instanceof Element && !event.target.closest('button,a,input'))navigate(i.id);}}><button className="favorite-item-open" data-preview-id={i.id} onClick={()=>navigate(i.id)}><Icon item={i}/><span><strong>{i.name}</strong><small>{catalog.categories[i.type]??i.type}</small></span></button><ItemJump id={i.id} name={i.name}/><button className={`list-favorite ${favorites.includes(i.id)?'saved':''}`} aria-label={`${favorites.includes(i.id)?'Remove':'Add'} ${i.name} ${favorites.includes(i.id)?'from':'to'} Favorites`} aria-pressed={favorites.includes(i.id)} data-tooltip={favorites.includes(i.id)?'Remove from Favorites':'Add to Favorites'} onClick={()=>updateWorkspace(data=>({...data,favorites:data.favorites.includes(i.id)?data.favorites.filter(id=>id!==i.id):[...data.favorites,i.id]}))}><svg width="18" height="18" viewBox="0 0 24 24" fill={favorites.includes(i.id)?'currentColor':'none'} stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" aria-hidden="true"><path d="m12 2.5 2.9 6 6.6.9-4.8 4.7 1.2 6.6-5.9-3.1-5.9 3.1 1.2-6.6L2.5 9.4l6.6-.9Z"/></svg></button></div>)}{!visible.length&&<div className="empty"><h3>No items here yet</h3><p>{category==='Favorites'?'Star an item or drag a required input here.':'Try a different name or category.'}</p><button onClick={()=>{setQuery('');setCategory('All items');}}>Show all items</button></div>}</div>}</section>}
  {category==='Favorites'&&!item&&<section className="detail-panel empty"><h3>Select a favorite</h3><p>Choose an item on the left to see its recipe.</p></section>}
- {item&&(!gridView||gridDetail)&&<section className="detail-panel" key={item.id}><div className="detail-actions">{gridOrigin&&!history.length?<button onClick={returnToGrid}>← Grid</button>:<button disabled={!history.length} onClick={goBack}>← Back</button>}{gridOrigin&&!!history.length&&<button data-tooltip="return to grid" aria-label="return to grid" onClick={returnToGrid}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg></button>}</div><div {...itemDragProps(item.id)} className={`item-title ${isDefenseItem(item)?'defense-item':''}`}><Icon item={item} large/><div><div className="eyebrow">{catalog.categories[item.type]??item.type}</div><h2>{item.name}</h2></div><div className="item-title-actions"><NetworkButton id={item.id} catalog={catalog}/><ItemJump id={item.id} name={item.name}/><button className={`favorite ${favorites.includes(item.id)?'saved':''}`} aria-label={favorites.includes(item.id)?'Remove favorite':'Add favorite'} onClick={favorite}><svg width="24" height="24" viewBox="0 0 24 24" fill={favorites.includes(item.id)?'currentColor':'none'} stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" aria-hidden="true"><path d="m12 2.5 2.9 6 6.6.9-4.8 4.7 1.2 6.6-5.9-3.1-5.9 3.1 1.2-6.6L2.5 9.4l6.6-.9Z"/></svg></button><BuildingDetails key={item.id} item={item}/></div></div><ItemOverview key={item.id} item={item} items={itemMap}/><div className="facts"><span>STACK SIZE <b>{item.stack_size}</b></span><span>RECIPES <b>{recipes.length}</b></span><span>{item.energy?'FUEL ENERGY':'REPLICATOR'} <b>{item.energy?`${(item.energy/1e6).toLocaleString()} MJ`:recipe?.handcraft?'Available':'Not available'}</b></span></div>
+ {item&&(!gridView||gridDetail)&&<section className="detail-panel" key={item.id} ref={detailRef} onScroll={event=>{const previous=itemViews.current.get(item.id);itemViews.current.set(item.id,{...previous,recipeId,quantity,tab,scroll:event.currentTarget.scrollTop});}}><div className="detail-actions">{gridOrigin&&!history.length?<button onClick={returnToGrid}>← Grid</button>:<button disabled={!history.length} onClick={goBack}>← Back</button>}{gridOrigin&&!!history.length&&<button data-tooltip="return to grid" aria-label="return to grid" onClick={returnToGrid}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg></button>}</div><div {...itemDragProps(item.id)} className={`item-title ${isDefenseItem(item)?'defense-item':''}`}><Icon item={item} large/><div><div className="eyebrow">{catalog.categories[item.type]??item.type}</div><h2>{item.name}</h2></div><div className="item-title-actions"><PinItemButton name={item.name} pinned={pinnedItems.includes(item.id)} onClick={()=>togglePinned(item.id)}/><NetworkButton id={item.id} catalog={catalog}/><ItemJump id={item.id} name={item.name}/><button className={`favorite ${favorites.includes(item.id)?'saved':''}`} aria-label={favorites.includes(item.id)?'Remove favorite':'Add favorite'} onClick={favorite}><svg width="24" height="24" viewBox="0 0 24 24" fill={favorites.includes(item.id)?'currentColor':'none'} stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" aria-hidden="true"><path d="m12 2.5 2.9 6 6.6.9-4.8 4.7 1.2 6.6-5.9-3.1-5.9 3.1 1.2-6.6L2.5 9.4l6.6-.9Z"/></svg></button><BuildingDetails key={item.id} item={item}/></div></div><ItemOverview key={item.id} item={item} items={itemMap}/><div className="facts"><span>STACK SIZE <b>{item.stack_size}</b></span><span>RECIPES <b>{recipes.length}</b></span><span>{item.energy?'FUEL ENERGY':'REPLICATOR'} <b>{item.energy?`${(item.energy/1e6).toLocaleString()} MJ`:recipe?.handcraft?'Available':'Not available'}</b></span></div>
  <div className="tabs"><button className={tab==='recipe'?'active':''} onClick={()=>setTab('recipe')}>Crafting recipe</button><button className={tab==='chain'?'active':''} onClick={()=>setTab('chain')}>Production chain</button></div>
  {recipe?<><div className="recipe-controls">{recipes.length > 1 && <label>RECIPE<ThemedSelect className={isDefenseItem(item)?'defense-item':''} aria-label="Recipe" value={recipe.id} onChange={e=>setRecipeId(Number(e.target.value))}>{recipes.map(r=><option value={r.id} key={r.id}>{r.name.replace(/^ - /,'')}{r.explicit?' · alternate':''}</option>)}</ThemedSelect></label>}<label>TARGET QUANTITY<input type="number" aria-label="Target quantity" min="1" max="1000000" value={quantity} onChange={e=>setQuantity(Math.min(1000000,Math.max(1,Math.floor(Number(e.target.value)||1))))}/></label></div>
  {tab==='recipe'?<><div className="recipe-box"><div className="section-label">REQUIRED INPUTS <span>{batches} crafting batch{batches===1?'':'es'}</span></div><div className="ingredients" key={recipe.id}>{pairs(recipe.inputs).map(p=><ExpandableInput key={p.id} catalog={catalog} itemMap={itemMap} id={p.id} count={p.count*batches} path={[selected]} onItemDrag={setDraggedItem}/>)}</div><div className="conversion"><span>↓</span><span>{recipe.seconds}s per batch · {(recipe.seconds*batches).toLocaleString()}s total base time</span></div><div className="section-label">OUTPUTS <span>{recipe.type==='FRACTIONATE'?'Expected yields · probabilistic':'Includes any byproducts'}</span></div><div className="ingredients outputs">{pairs(recipe.outputs).map(p=>chip(p.id,p.count*batches,false))}</div></div><div className="recipe-meta"><div><span className="section-label">MADE IN</span><div className="facility-links">{(catalog.facilities[recipe.type]?.buildings??[]).map(id=>chip(id))}</div>{!catalog.facilities[recipe.type]?.buildings.length&&<p>{catalog.facilities[recipe.type]?.name??recipe.type}</p>}</div><div><span className="section-label">UNLOCKED BY</span><p>{catalog.techs.filter(t=>t.recipes?.includes(recipe.id)).map(t=>t.name).join(', ')||'Starting recipe / no technology listed'}</p></div></div>{recipe.type==='FRACTIONATE'&&<p className="note">Fractionation has a 1% conversion chance. Quantities and processing times are statistical averages, not guaranteed yields.</p>}</>:<div className="chain"><p className="note">Click a branch to expand. Ingredients use their first listed recipe; alternate choices apply to the selected item only. Byproducts are shown in recipes, but are not reused across branches. Fractionation quantities are expected averages.</p>{tree(item.id,quantity,[])}</div>}</>:<div className="resource-card"><span>◇</span><h3>{!darkFog&&recipesFor(cloud.catalog??snapshot as unknown as Catalog,item.id).length?'Recipe requires Dark Fog materials':'Gathered, not crafted'}</h3>{!darkFog&&recipesFor(cloud.catalog??snapshot as unknown as Catalog,item.id).length?<><p>Enable Dark Fog to view this crafting recipe and its required materials.</p><button className="design-button" onClick={toggleDarkFog}>Show crafting recipe · Enable Dark Fog</button></>:<p>{item.mining_from??item.explicit_produce_from??'No crafting recipe is listed in the wiki snapshot. This item is obtained through gameplay.'}</p>}</div>}
