@@ -1,19 +1,20 @@
 import { pairs, recipesFor, type Catalog } from './catalog';
 
-export function taskItemLinks(catalog: Catalog, existing: number[], itemId: number, includeInputs: boolean): number[] {
+export function taskItemLinks(catalog: Catalog, existing: number[], itemId: number, includeInputs: boolean, recipeId?: number): number[] {
   const visible = new Set(catalog.items.map(item => item.id));
   if (!visible.has(itemId)) return existing;
-  const recipe = includeInputs ? recipesFor(catalog, itemId)[0] : undefined;
+  const recipes = includeInputs ? recipesFor(catalog, itemId) : [];
+  const recipe = recipeId === undefined ? recipes[0] : recipes.find(option => option.id === recipeId);
   const inputs = recipe ? pairs(recipe.inputs).map(input => input.id).filter(id => visible.has(id)) : [];
   return [...new Set([...existing, itemId, ...inputs])];
 }
 
 // Record provenance only for newly attached inputs; manually attached items stay unmarked.
-export function taskItemAttachment(catalog: Catalog, task: {itemIds?:number[]; requiredInputs?:Record<string,number>}, itemId:number, includeInputs:boolean) {
-  const itemIds=taskItemLinks(catalog,task.itemIds??[],itemId,includeInputs);
+export function taskItemAttachment(catalog: Catalog, task: {itemIds?:number[]; requiredInputs?:Record<string,number>}, itemId:number, includeInputs:boolean, recipeId?:number) {
+  const itemIds=taskItemLinks(catalog,task.itemIds??[],itemId,includeInputs,recipeId);
   const requiredInputs={...task.requiredInputs};
   delete requiredInputs[itemId];
-  if(includeInputs) for(const id of taskItemLinks(catalog,[],itemId,true)) {
+  if(includeInputs) for(const id of itemIds) {
     if(id!==itemId && !(task.itemIds??[]).includes(id)) requiredInputs[id]=itemId;
   }
   return {itemIds,requiredInputs};

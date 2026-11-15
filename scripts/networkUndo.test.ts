@@ -159,3 +159,17 @@ test('drag tracking cancels a missed mouse release and removes its listeners', a
   }
  }
 });
+
+test('task attachment uses the chosen recipe for inputs and their parent links', async () => {
+ const {taskItemAttachment} = await import('../src/lib/taskItemLinks');
+ const catalog = {
+   items: [1,2,3,4].map(id => ({id})),
+   recipes: [
+     {id: 10, inputs: [2,1], outputs: [1,1]},
+     {id: 20, inputs: [3,2], outputs: [1,1]},
+     {id: 30, inputs: [4,1], outputs: [2,1]},
+   ],
+ } as Catalog;
+ assert.deepEqual(taskItemAttachment(catalog, {}, 1, true, 20), {itemIds:[1,3], requiredInputs:{3:1}});
+ assert.deepEqual(taskItemAttachment(catalog, {}, 1, true, 30), {itemIds:[1], requiredInputs:{}});
+});

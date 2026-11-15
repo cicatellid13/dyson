@@ -68,3 +68,8 @@ html.task-grid-dragging,html.task-grid-dragging *{cursor:url('../assets/nebula-g
 .pinned-task-badges .task-input-arrow{position:static;font-size:14px}
 .pinned-task-type{display:grid;place-items:center;min-width:9px;height:11px;padding:0 1px;border-radius:2px;background:#132620;color:#cdeadd;font-size:9px;line-height:1}
 .pinned-task-type svg{width:9px;height:9px}
+
+.todo-recipe-dialog{width:min(480px,calc(100vw - 32px))}
+.todo-recipe-options{display:grid;gap:8px;margin:16px 0}
+.todo-recipe-options button{display:grid;gap:4px;text-align:left;white-space:normal}
+.todo-recipe-options small{color:#a7c0b3}
