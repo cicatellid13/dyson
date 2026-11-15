@@ -1,3 +1,4 @@
+import { PlanetIcon, planetTypeChoices } from './PlanetIcon';
 import { PinItemButton } from './PinnedItemStrip';
 import { locationPinId } from '../lib/pinnedItems';
 import { NetworkTodos } from './NetworkTodos';
@@ -140,7 +141,7 @@ function PlanetCard({ planet, items, onOpen }: { planet: DesignSection; items: M
   const exports = planet.exports.filter(entry => items.has(entry.itemId) && (!selected || entry.itemId === selected));
   const visibleCount = (direction !== 'exports' ? imports.length : 0) + (direction !== 'imports' ? exports.length : 0);
   return <article className="planet-card" aria-label={`${planet.name} trade overview`}>
-    <button className="planet-card-open" onClick={onOpen} aria-label={`Open ${planet.name}`}><span aria-hidden="true">◉</span><strong>{planet.name || 'Unnamed planet'}</strong>{planet.planetType && <small className="planet-type-label">{planet.planetType}</small>}<PlanetTags tags={planet.specializations}/><span className="planet-open-hint">Open planet ↗</span></button>
+    <button className="planet-card-open" onClick={onOpen} aria-label={`Open ${planet.name}`}><PlanetIcon type={planet.planetType} size={24}/><strong>{planet.name || 'Unnamed planet'}</strong>{planet.planetType && <small className="planet-type-label">{planet.planetType}</small>}<PlanetTags tags={planet.specializations}/><span className="planet-open-hint">Open planet ↗</span></button>
     <div className="planet-card-filters">
       <div className="logistics-filter"><span className="logistics-filter-label">Logistics</span><div className="logistics-bubbles" role="group" aria-label={`${planet.name} logistics filter`}>
         {(['imports', 'exports'] as const).map(value => <button key={value} type="button" className={`logistics-bubble ${value}`} aria-label={`${planet.name} ${value} filter`} aria-pressed={direction === value} onClick={() => changeDirection(value)}>
@@ -197,11 +198,11 @@ export function Design({ catalog, pinnedLocations, onTogglePin, onLocationDrag }
     commit({ ...data, sections: data.sections.map(s => s.id === activeId ? { ...s, ...changes } : s) });
   }
   function labelChoices(key:'planetTypes'|'specializationTypes') {
-    const values=[...(key==='planetTypes'?['Lava','Ocean','Gas giant']:['Smelting','Science','Dyson components','Mining','Fuel','Manufacturing']),...(data[key]??[]),...data.sections.flatMap(s=>key==='planetTypes'?(s.planetType?[s.planetType]:[]):s.specializations??[])];
+    const values=[...(key==='planetTypes'?planetTypeChoices:['Smelting','Science','Dyson components','Mining','Fuel','Manufacturing']),...(data[key]??[]),...data.sections.flatMap(s=>key==='planetTypes'?(s.planetType?[s.planetType]:[]):s.specializations??[])];
     return values.filter((v,i)=>values.findIndex(other=>other.toLowerCase()===v.toLowerCase())===i);
   }
   function rememberLabel(key:'planetTypes'|'specializationTypes',tag:string) {
-    updateWorkspace(current=>({...current,design:{...current.design,[key]:[...new Set([...(current.design[key]??[]),...labelChoices(key),tag])]}}));
+    updateWorkspace(current=>({...current,design:{...current.design,[key]:[...new Set([...(current.design[key]??[]),tag])]}}));
   }
   function begin(kind: DesignSection['kind'], parentId: string | null = null, placement: 'sidebar' | 'inline' = 'inline') {
     if (kind === 'planet' && !roots.some(system => system.id === parentId)) return;
@@ -232,7 +233,7 @@ export function Design({ catalog, pinnedLocations, onTogglePin, onLocationDrag }
       onDragEnd={() => { setDraggingId(null); setDropTarget(null); onLocationDrag(null); }}
       onClick={() => { navigate(section.id); if (section.kind === 'system') setExpandedSystems(current => { const next = new Set(current); if (next.has(section.id)) next.delete(section.id); else next.add(section.id); return next; }); }}>
       {section.kind === 'system' && <span className="design-disclosure" aria-hidden="true">{expandedSystems.has(section.id) ? '▾' : '▸'}</span>}
-      <span>{section.kind === 'system' ? '✧' : '◉'}</span><span><strong>{section.name || 'Unnamed location'}</strong><small>{section.kind === 'system' ? `${data.sections.filter(p => p.parentId === section.id).length} planet${data.sections.filter(p => p.parentId === section.id).length === 1 ? '' : 's'}` : 'Planet'}</small></span>
+      {section.kind === 'system' ? <span aria-hidden="true">✧</span> : <PlanetIcon type={section.planetType}/>}<span><strong>{section.name || 'Unnamed location'}</strong><small>{section.kind === 'system' ? `${data.sections.filter(p => p.parentId === section.id).length} planet${data.sections.filter(p => p.parentId === section.id).length === 1 ? '' : 's'}` : 'Planet'}</small></span>
       <span className="planet-sidebar-markers">
         {section.kind === 'planet' && !!section.checklist?.length && <span className="planet-todo-marker" data-tooltip="To-do" data-priority-tasks={JSON.stringify(priorityTaskSummary(section.checklist))} role="link" tabIndex={0} aria-label={`Open ${section.name} to-do`}
           onClick={event => { event.stopPropagation(); navigate(section.id); setNotesMode('todo', section.id); }}

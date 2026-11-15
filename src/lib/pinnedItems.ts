@@ -7,7 +7,7 @@ export type TaskPinSnapshot = {pinned:string[];links:Record<string,string[]>};
 export type PinnedGroups = Record<string,number[]>;
 export type PinnedState = {items:PinId[];groups:PinnedGroups};
 export type PinItemSource = 'external'|'strip'|{planet:string};
-export type PinnedStripEntry = {id:PinId;name:string;icon:string|null;kind:'item'|'planet'|'system';children?:PinnedGroupItem[]};
+export type PinnedStripEntry = {id:PinId;name:string;icon:string|null;kind:'item'|'planet'|'system';planetType?:string;children?:PinnedGroupItem[]};
 export type PinDropSide = 'before'|'after';
 export const locationPinId = (kind:'planet'|'system',id:string) => `${kind}:${id}`;
 export function parseLocationPin(id:PinId):{kind:'planet'|'system';id:string}|null {
@@ -17,7 +17,7 @@ export function parseLocationPin(id:PinId):{kind:'planet'|'system';id:string}|nu
 }
 export const pinToken = (id:PinId) => typeof id==='number'?`item:${id}`:id;
 
-export function resolvePinnedEntries(ids:PinId[],items:{id:number;name:string;icon:string|null}[],sections:(TaskSection&{parentId:string|null;name:string})[],groups:PinnedGroups={}):PinnedStripEntry[] {
+export function resolvePinnedEntries(ids:PinId[],items:{id:number;name:string;icon:string|null}[],sections:(TaskSection&{parentId:string|null;name:string;planetType?:string})[],groups:PinnedGroups={}):PinnedStripEntry[] {
   return ids.flatMap<PinnedStripEntry>(id=>{
     if(typeof id==='number'){
       const item=items.find(item=>item.id===id);
@@ -28,7 +28,7 @@ export function resolvePinnedEntries(ids:PinId[],items:{id:number;name:string;ic
     if(!section)return [];
     const parent=sections.find(parent=>parent.id===section.parentId&&parent.kind==='system');
     const name=section.name||(section.kind==='planet'?'Untitled planet':'Unnamed system');
-    return [{id,name:section.kind==='planet'?`${parent?.name||'Unassigned system'}/${name}`:name,icon:null,kind:section.kind,children:section.kind==='planet'?orderPinnedGroup(groups[id]??[],section.checklist??[]).flatMap(id=>{
+    return [{id,name:section.kind==='planet'?`${parent?.name||'Unassigned system'}/${name}`:name,icon:null,kind:section.kind,...(section.kind==='planet'&&section.planetType?{planetType:section.planetType}:{}),children:section.kind==='planet'?orderPinnedGroup(groups[id]??[],section.checklist??[]).flatMap(id=>{
       const item=items.find(item=>item.id===id);
       const tasks=(section.checklist??[]).filter(task=>task.itemIds?.includes(id));
       const required=tasks.some(task=>task.requiredInputs?.[id]!==undefined);

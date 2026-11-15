@@ -30,6 +30,8 @@ test('mixed item and location pins preserve legacy pins and resolve current name
  assert.deepEqual(parseLocationPin('system:s1'),{kind:'system',id:'s1'});
  assert.equal(parseLocationPin(1303),null);
  assert.deepEqual(resolvePinnedEntries(pins,[item],[system,planet]).map(entry=>[entry.kind,entry.name]),[['item','Processor'],['planet','Sadira/IV'],['system','Sadira']]);
+ assert.equal(resolvePinnedEntries(pins,[item],[system,{...planet,planetType:'Lava'}])[1].planetType,'Lava');
+ assert.equal(resolvePinnedEntries(pins,[item],[system,{...planet,planetType:'Sakura Ocean'}])[1].planetType,'Sakura Ocean');
  assert.equal(resolvePinnedEntries(['planet:p1'],[],[{...system,name:'Renamed'},planet])[0].name,'Renamed/IV');
  assert.deepEqual(resolvePinnedEntries(pins,[],[system]).map(entry=>entry.id),['system:s1']);
  assert.equal(resolvePinnedEntries(['planet:p1'],[],[{...planet,parentId:null}])[0].name,'Unassigned system/IV');

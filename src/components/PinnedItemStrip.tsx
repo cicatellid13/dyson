@@ -1,11 +1,12 @@
+import { PlanetIcon } from './PlanetIcon';
 import { TodoTypeIcon, todoTypeLabels } from './TodoTypeIcon';
 import { useEffect, useRef, useState, type CSSProperties, type HTMLAttributes, type PointerEvent as ReactPointerEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { classifyPinDrop, pinToken, type PinDropSide, type PinItemSource, type PinId, type PinnedStripEntry, type PinnedGroupItem } from '../lib/pinnedItems';
 import { createPointerDragSession, watchDragPointer } from '../lib/pointerDragSession';
 
-export function LocationPinIcon({kind}:{kind:'planet'|'system'}) {
-  return <svg width="29" height="29" viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{kind==='planet'?<><circle cx="16" cy="16" r="9"/><ellipse cx="16" cy="16" rx="15" ry="4" transform="rotate(-28 16 16)"/></>:<><path d="m16 9 2 5 5 2-5 2-2 5-2-5-5-2 5-2 2-5Z" fill="currentColor" strokeWidth="1.2"/><path d="M8 5.5a13 13 0 0 1 19 17M24 26.5a13 13 0 0 1-19-17"/><circle cx="6" cy="7" r="2.3"/><circle cx="26" cy="25" r="2.3"/></>}</svg>;
+function SystemPinIcon() {
+  return <svg width="29" height="29" viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m16 9 2 5 5 2-5 2-2 5-2-5-5-2 5-2 2-5Z" fill="currentColor" strokeWidth="1.2"/><path d="M8 5.5a13 13 0 0 1 19 17M24 26.5a13 13 0 0 1-19-17"/><circle cx="6" cy="7" r="2.3"/><circle cx="26" cy="25" r="2.3"/></svg>;
 }
 
 export function PinItemButton({name, pinned, onClick, kind='item'}: {name:string;pinned:boolean;onClick:()=>void;kind?:'item'|'planet'|'system'}) {
@@ -83,7 +84,7 @@ export function PinnedItemStrip(props:Props) {
   function open(event:React.MouseEvent,id:PinId){if(suppressClick.current&&event.detail!==0){suppressClick.current=false;return;}onSelect(id);}
   const intent=drag&&!drag.outside?drag.intent:incoming;
   const dragged=drag?.source.planet?items.find(entry=>entry.id===drag.source.planet)?.children?.find(item=>item.id===drag.source.id):items.find(item=>item.id===drag?.source.id);
-  const renderIcon=(item:PinnedStripEntry|PinnedGroupItem)=>item.icon?<img src={`${import.meta.env.BASE_URL}${item.icon}`} alt="" draggable={false}/>:'kind' in item&&item.kind!=='item'?<LocationPinIcon kind={item.kind}/>:<span aria-hidden="true">◇</span>;
+  const renderIcon=(item:PinnedStripEntry|PinnedGroupItem)=>item.icon?<img src={`${import.meta.env.BASE_URL}${item.icon}`} alt="" draggable={false}/>:'kind' in item&&item.kind==='planet'?<PlanetIcon type={item.planetType} size={30}/>:'kind' in item&&item.kind==='system'?<SystemPinIcon/>:<span aria-hidden="true">◇</span>;
   if(!items.length&&!acceptingItems)return null;
   return <nav ref={track} className={`pinned-item-strip ${acceptingItems?'accepting-items':''} ${dropActive?'incoming-drop-target':''}`} aria-label="Pinned items"
     onDragOver={event=>{

@@ -1,4 +1,6 @@
-import { useSessionSelection } from '../lib/sessionExpansion';
+import { useState } from 'react';
+import { useWorkspace } from '../lib/persistence';
+import { profileStorageKey } from '../lib/profiles';
 import { calculateSphereDesign } from '../lib/sphereDesign';
 import './SphereDesignLab.css';
 
@@ -7,6 +9,27 @@ type LabInputs = { designs: [DesignInput, DesignInput]; rocketRate: string; cell
 
 const emptyDesign: DesignInput = { name: '', structurePoints: '', cellPoints: '', powerGW: '' };
 const emptyLab: LabInputs = { designs: [emptyDesign, emptyDesign], rocketRate: '', cellRate: '' };
+function loadLabInputs(key: string): LabInputs {
+  try {
+    const saved = JSON.parse(localStorage.getItem(key) ?? 'null') as Partial<LabInputs> | null;
+    if (!saved || !Array.isArray(saved.designs) || saved.designs.length !== 2) return emptyLab;
+    const [first, second] = saved.designs;
+    const restoreDesign = (design: Partial<DesignInput> | null): DesignInput => ({
+      name: typeof design?.name === 'string' ? design.name : '',
+      structurePoints: typeof design?.structurePoints === 'string' ? design.structurePoints : '',
+      cellPoints: typeof design?.cellPoints === 'string' ? design.cellPoints : '',
+      powerGW: typeof design?.powerGW === 'string' ? design.powerGW : '',
+    });
+    return {
+      designs: [restoreDesign(first), restoreDesign(second)],
+      rocketRate: typeof saved.rocketRate === 'string' ? saved.rocketRate : '',
+      cellRate: typeof saved.cellRate === 'string' ? saved.cellRate : '',
+    };
+  } catch {
+    return emptyLab;
+  }
+}
+
 const designFields = [
   { key: 'structurePoints', label: 'Structure points', whole: true },
   { key: 'cellPoints', label: 'Cell points', whole: true },
@@ -35,8 +58,20 @@ function duration(minutes: number) {
 }
 
 export function SphereDesignLab() {
-  const [draft, setDraft] = useSessionSelection('sphere-design-lab');
-  const inputs: LabInputs = draft === null ? emptyLab : JSON.parse(draft);
+  const { profileId } = useWorkspace();
+  const storageKey = profileStorageKey('dsp-sphere-design-lab-v1', profileId);
+  const [inputs, setInputs] = useState(() => loadLabInputs(storageKey));
+  const [saveFailed, setSaveFailed] = useState(false);
+
+  function saveInputs(next: LabInputs) {
+    setInputs(next);
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(next));
+      setSaveFailed(false);
+    } catch {
+      setSaveFailed(true);
+    }
+  }
   const names = inputs.designs.map((design, index) => design.name.trim() || (index === 0 ? 'Design A' : 'Design B'));
   const results = inputs.designs.map(design => calculateSphereDesign({
     structurePoints: readNumber(design.structurePoints, true),
@@ -56,13 +91,14 @@ export function SphereDesignLab() {
   function changeDesign(index: number, field: keyof DesignInput, value: string) {
     const designs: LabInputs['designs'] = [...inputs.designs];
     designs[index] = { ...designs[index], [field]: value };
-    setDraft(JSON.stringify({ ...inputs, designs }));
+    saveInputs({ ...inputs, designs });
   }
 
   return <section className="sphere-design-lab" aria-labelledby="sphere-design-lab-title">
     <header>
       <h1 id="sphere-design-lab-title">Sphere Design Lab</h1>
       <p>Enter the planned point totals for one layer per design from the in-game Dyson Sphere editor.</p>
+      {saveFailed && <p role="alert">Your changes could not be saved on this device.</p>}
     </header>
 
     <div className="sphere-design-inputs">
@@ -80,9 +116,9 @@ export function SphereDesignLab() {
     <fieldset className="sphere-design-rates">
       <legend>Shared build rates</legend>
       <label>Rockets launched/min<input type="number" min="0" step="any" value={inputs.rocketRate} aria-invalid={inputs.rocketRate !== '' && readNumber(inputs.rocketRate) === null}
-        onChange={event => setDraft(JSON.stringify({ ...inputs, rocketRate: event.target.value }))} /></label>
+        onChange={event => saveInputs({ ...inputs, rocketRate: event.target.value })} /></label>
       <label>Sails absorbed/min<input type="number" min="0" step="any" value={inputs.cellRate} aria-invalid={inputs.cellRate !== '' && readNumber(inputs.cellRate) === null}
-        onChange={event => setDraft(JSON.stringify({ ...inputs, cellRate: event.target.value }))} /></label>
+        onChange={event => saveInputs({ ...inputs, cellRate: event.target.value })} /></label>
     </fieldset>
 
     <div className="sphere-design-results">
