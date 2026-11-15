@@ -61,3 +61,10 @@ html.task-grid-dragging,html.task-grid-dragging *{cursor:url('../assets/nebula-g
 .network-todos>header label input[type=checkbox]{flex:0 0 16px;width:16px;height:16px;margin:0;padding:0;accent-color:#8ed6b4}
 .task-input-arrow{position:absolute;bottom:-1px;left:1px;z-index:2;font-size:17px;font-weight:900;line-height:1;pointer-events:none;background:linear-gradient(165deg,#fff9d8 12%,#ffe58c 35%,#eebf46 58%,#fff2b5 76%,#b98020);background-clip:text;-webkit-background-clip:text;color:transparent;filter:drop-shadow(0 0 3px #e6b744aa) drop-shadow(0 1px 1px #211600);}.network-task-items button{position:relative}
 .task-remove-prompt{position:fixed;z-index:10000;width:232px;padding:12px;border:1px solid #577d6b;border-radius:12px;background:#101f23;color:#dcebe4;box-shadow:0 8px 26px #0008;font-size:12px}.task-remove-prompt strong{font-weight:550}.task-remove-prompt>div{display:flex;gap:8px;margin-top:10px}.task-remove-prompt button{padding:6px 10px;border:1px solid #476555;border-radius:7px;background:#20372d;color:#c8e7d4;font-size:11px}.task-remove-prompt button:hover{background:#345040}.task-remove-prompt button:first-child{color:#f0bec2;border-color:#86555d;background:#38272c}
+
+.todo-type.build,.todo-filters .todo-filter.build{--chip:#f0c483}
+.todo-type-icon svg,.todo-filter-icon svg{width:1em;height:1em;vertical-align:middle}
+.pinned-task-badges{position:absolute;bottom:0;left:1px;z-index:2;display:flex;align-items:center;max-width:calc(100% - 2px);flex-wrap:wrap;pointer-events:none}
+.pinned-task-badges .task-input-arrow{position:static;font-size:14px}
+.pinned-task-type{display:grid;place-items:center;min-width:9px;height:11px;padding:0 1px;border-radius:2px;background:#132620;color:#cdeadd;font-size:9px;line-height:1}
+.pinned-task-type svg{width:9px;height:9px}

@@ -87,11 +87,13 @@ test('required inputs move directly behind their parent ahead of existing group 
  assert.deepEqual(orderPinnedGroup([1,2],cycle),[1,2]);
  assert.deepEqual(previous,[1101,9999,1303,8888,1102]);
 });
-test('planet group required-input arrows reflect current to-do associations and deduplicate across tasks',()=>{
- const item={id:1101,name:'Iron Ingot',icon:null},planet={id:'p1',kind:'planet',parentId:null,name:'Home',checklist:[{id:'t1',itemIds:[1101],requiredInputs:{1101:1303}},{id:'t2',itemIds:[1101]}]};
+test('planet group badges reflect current to-do types and required inputs without duplicates',()=>{
+ const item={id:1101,name:'Iron Ingot',icon:null},planet={id:'p1',kind:'planet',parentId:null,name:'Home',checklist:[{id:'t1',type:'build',itemIds:[1101],requiredInputs:{1101:1303}},{id:'t2',type:'build',itemIds:[1101]},{id:'t3',type:'export',itemIds:[1101]}]};
  const groups={'planet:p1':[1101]};
  const entry=resolvePinnedEntries(['planet:p1'],[item],[planet],groups)[0];
  assert.deepEqual(entry.children,[{...item,requiredInput:true}]);
+ const parent=resolvePinnedEntries(['planet:p1'],[item],[{...planet,checklist:planet.checklist.slice(1)}],groups)[0];
+ assert.deepEqual(parent.children,[{...item,taskTypes:['build','export']}]);
  const changed=resolvePinnedEntries(['planet:p1'],[item],[{...planet,checklist:[{id:'t2',itemIds:[1101]}]}],groups)[0];
  assert.deepEqual(changed.children,[item]);
 });

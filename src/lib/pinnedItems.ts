@@ -1,6 +1,7 @@
+import type { TodoType } from './planning';
 export type PinId = number | string;
-export type PinnedGroupItem = {id:number;name:string;icon:string|null;requiredInput?:boolean};
-type PlanetTask = {id:string;itemIds?:number[];requiredInputs?:Record<string,number>};
+export type PinnedGroupItem = {id:number;name:string;icon:string|null;requiredInput?:boolean;taskTypes?:TodoType[]};
+type PlanetTask = {id:string;type?:TodoType;itemIds?:number[];requiredInputs?:Record<string,number>};
 type TaskSection = {id:string;kind:'planet'|'system';checklist?:PlanetTask[]};
 export type TaskPinSnapshot = {pinned:string[];links:Record<string,string[]>};
 export type PinnedGroups = Record<string,number[]>;
@@ -29,8 +30,10 @@ export function resolvePinnedEntries(ids:PinId[],items:{id:number;name:string;ic
     const name=section.name||(section.kind==='planet'?'Untitled planet':'Unnamed system');
     return [{id,name:section.kind==='planet'?`${parent?.name||'Unassigned system'}/${name}`:name,icon:null,kind:section.kind,children:section.kind==='planet'?orderPinnedGroup(groups[id]??[],section.checklist??[]).flatMap(id=>{
       const item=items.find(item=>item.id===id);
-      const required=(section.checklist??[]).some(task=>task.itemIds?.includes(id)&&task.requiredInputs?.[id]!==undefined);
-      return item?[{...item,...(required?{requiredInput:true as const}:{})}]:[];
+      const tasks=(section.checklist??[]).filter(task=>task.itemIds?.includes(id));
+      const required=tasks.some(task=>task.requiredInputs?.[id]!==undefined);
+      const taskTypes=[...new Set(tasks.flatMap(task=>task.type?[task.type]:[]))];
+      return item?[{...item,...(required?{requiredInput:true as const}:taskTypes.length?{taskTypes}:{})}]:[];
     }):undefined}];
   });
 }

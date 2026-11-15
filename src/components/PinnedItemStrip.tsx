@@ -1,3 +1,4 @@
+import { TodoTypeIcon, todoTypeLabels } from './TodoTypeIcon';
 import { useEffect, useRef, useState, type CSSProperties, type HTMLAttributes, type PointerEvent as ReactPointerEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { classifyPinDrop, pinToken, type PinDropSide, type PinItemSource, type PinId, type PinnedStripEntry, type PinnedGroupItem } from '../lib/pinnedItems';
@@ -117,8 +118,10 @@ export function PinnedItemStrip(props:Props) {
           <button type="button" className="pinned-item-close" aria-label={`Unpin ${item.name}`} data-tooltip={`Unpin ${item.name}`} onClick={()=>onClose(item.id)}>×</button>
         </div>
         {grouped&&<div className={`todo-linked-items pinned-group-items ${children.length===1?'single':''}`} style={{'--linked-count':children.length} as CSSProperties}>
-          <div className="todo-linked-track">{children.map((child,index)=><button key={child.id} type="button" data-group-item={child.id} style={{'--linked-index':index,'--linked-layer':Math.max(1,6-index)} as CSSProperties} className={`${active===child.id?'active':''} ${intent?.kind==='group-reorder'&&intent.planet===planet&&intent.target===child.id?'drop-target':''}`} aria-label={child.name} data-tooltip={child.name} draggable={false} onPointerDown={event=>start(event,{id:child.id,planet})} onClick={event=>open(event,child.id)}
-            onKeyDown={event=>{if(event.key==='Delete'||event.key==='Backspace'){event.preventDefault();current.current.onRemoveGrouped(planet,child.id);}if(event.altKey&&(event.key==='ArrowLeft'||event.key==='ArrowRight')){event.preventDefault();const target=children[index+(event.key==='ArrowLeft'?-1:1)];if(target)current.current.onReorderGrouped(planet,child.id,target.id);}}}>{renderIcon(child)}{child.requiredInput&&<span className="task-input-arrow" aria-label="Required input">←</span>}</button>)}</div>
+          <div className="todo-linked-track">{children.map((child,index)=>{
+            const details=[child.name,...(child.requiredInput?['Required input']:[]),...(child.taskTypes??[]).map(type=>todoTypeLabels[type])].join(' · ');
+            return <button key={child.id} type="button" data-group-item={child.id} style={{'--linked-index':index,'--linked-layer':Math.max(1,6-index)} as CSSProperties} className={`${active===child.id?'active':''} ${intent?.kind==='group-reorder'&&intent.planet===planet&&intent.target===child.id?'drop-target':''}`} aria-label={details} data-tooltip={details} draggable={false} onPointerDown={event=>start(event,{id:child.id,planet})} onClick={event=>open(event,child.id)}
+            onKeyDown={event=>{if(event.key==='Delete'||event.key==='Backspace'){event.preventDefault();current.current.onRemoveGrouped(planet,child.id);}if(event.altKey&&(event.key==='ArrowLeft'||event.key==='ArrowRight')){event.preventDefault();const target=children[index+(event.key==='ArrowLeft'?-1:1)];if(target)current.current.onReorderGrouped(planet,child.id,target.id);}}}>{renderIcon(child)}{(child.requiredInput||!!child.taskTypes?.length)&&<span className="pinned-task-badges" aria-hidden="true">{child.requiredInput&&<span className="task-input-arrow">←</span>}{child.taskTypes?.map(type=><span key={type} className="pinned-task-type"><TodoTypeIcon type={type}/></span>)}</span>}</button>;})}</div>
         </div>}
       </div>;
     })}
