@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as Reac
 import { createPortal } from 'react-dom';
 import type { Item } from '../lib/catalog';
 import { CatalogGrid } from './CatalogGrid';
+import { watchDragPointer } from '../lib/pointerDragSession';
 import { useItemAccess } from './ItemAccess';
 
 export function TodoItemGrid({ items, onLink }: { items: Item[]; onLink: (taskId: string, itemId: number, includeInputs: boolean) => void }) {
@@ -13,7 +14,8 @@ export function TodoItemGrid({ items, onLink }: { items: Item[]; onLink: (taskId
   const suppressClick = useRef(false);
   useEffect(() => () => stopPointer.current?.(), []);
   function startPointer(event: ReactPointerEvent, id:number) {
-    if(event.button !== 0) return;
+    if(event.button !== 0 || !event.isPrimary) return;
+    stopPointer.current?.();
     event.preventDefault();
     suppressClick.current=false;
     const origin={x:event.clientX,y:event.clientY};
@@ -22,11 +24,7 @@ export function TodoItemGrid({ items, onLink }: { items: Item[]; onLink: (taskId
     function cleanup() {
       document.documentElement.classList.remove('task-item-dragging', 'task-grid-dragging');
       target?.classList.remove('todo-drop-target');
-      window.removeEventListener('pointermove',move,true);
-      window.removeEventListener('pointerup',up,true);
-      window.removeEventListener('pointercancel',cancel,true);
-      window.removeEventListener('blur',cancel);
-      document.removeEventListener('keydown',key,true);
+      stopWatching();
       setDragging(false);setGhost(null);draggingRef.current=false;
       stopPointer.current=undefined;
     }
@@ -40,13 +38,12 @@ export function TodoItemGrid({ items, onLink }: { items: Item[]; onLink: (taskId
       target?.classList.add('todo-drop-target');
     }
     function up(e:PointerEvent) {
-      if(moved){e.preventDefault();e.stopPropagation();const row=document.elementFromPoint(e.clientX,e.clientY)?.closest<HTMLElement>('[data-todo-id]');if(row?.dataset.todoId)linkRef.current(row.dataset.todoId,id,includeInputs);setOpen(false);}
-      cleanup();
+      try {
+        if(moved){e.preventDefault();e.stopPropagation();const row=document.elementFromPoint(e.clientX,e.clientY)?.closest<HTMLElement>('[data-todo-id]');if(row?.dataset.todoId)linkRef.current(row.dataset.todoId,id,includeInputs);setOpen(false);}
+      } finally {cleanup();}
     }
-    function cancel(){cleanup();}
-    function key(e:KeyboardEvent){if(e.key==='Escape')cancel();}
-    stopPointer.current?.();stopPointer.current=cleanup;
-    window.addEventListener('pointermove',move,true);window.addEventListener('pointerup',up,true);window.addEventListener('pointercancel',cancel,true);window.addEventListener('blur',cancel);document.addEventListener('keydown',key,true);
+    const stopWatching=watchDragPointer(event.nativeEvent,{move,up,cancel:cleanup});
+    stopPointer.current=cleanup;
   }
   const [open, setOpen] = useState(false);
   useEffect(() => { if (!open) setIncludeInputs(false); }, [open]);
@@ -58,7 +55,7 @@ export function TodoItemGrid({ items, onLink }: { items: Item[]; onLink: (taskId
   const actions = useItemAccess();
   useEffect(() => {
     if (!open) return;
-    function close() { cancelAnimationFrame(hideFrame.current ?? 0); draggingRef.current = false; setOpen(false); setDragging(false); }
+    function close() { stopPointer.current?.(); cancelAnimationFrame(hideFrame.current ?? 0); draggingRef.current = false; setOpen(false); setDragging(false); }
     function dropped() { setTimeout(close, 0); }
     function blur() { if (!draggingRef.current) close(); }
     function key(event: KeyboardEvent) { if (event.key === 'Escape') close(); }
@@ -71,6 +68,7 @@ export function TodoItemGrid({ items, onLink }: { items: Item[]; onLink: (taskId
     document.addEventListener('dragend', dropped, true);
     window.addEventListener('blur', blur);
     return () => {
+      stopPointer.current?.();
       document.removeEventListener('keydown', key);
       document.removeEventListener('pointerdown', outside);
       document.removeEventListener('drop', dropped, true);

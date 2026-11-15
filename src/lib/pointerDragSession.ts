@@ -40,3 +40,30 @@ export function createPointerDragSession(origin: DragPoint, callbacks: DragCallb
     },
   };
 }
+
+/** Track one pointer and cancel when the window can no longer deliver its release. */
+export function watchDragPointer(
+  origin: PointerEvent,
+  handlers: { move: (event: PointerEvent) => void; up: (event: PointerEvent) => void; cancel: () => void },
+) {
+  const controller = new AbortController();
+  const capture = { capture: true, signal: controller.signal };
+  const stop = () => controller.abort();
+  window.addEventListener('pointermove', event => {
+    if (event.pointerId !== origin.pointerId) return;
+    if (origin.pointerType === 'mouse' && !(event.buttons & 1)) handlers.cancel();
+    else handlers.move(event);
+  }, capture);
+  window.addEventListener('pointerup', event => {
+    if (event.pointerId === origin.pointerId) handlers.up(event);
+  }, capture);
+  window.addEventListener('pointercancel', event => {
+    if (event.pointerId === origin.pointerId) handlers.cancel();
+  }, capture);
+  window.addEventListener('pointerdown', handlers.cancel, capture);
+  window.addEventListener('blur', handlers.cancel, { signal: controller.signal });
+  window.addEventListener('resize', handlers.cancel, capture);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) handlers.cancel(); }, capture);
+  document.addEventListener('keydown', event => { if (event.key === 'Escape') handlers.cancel(); }, capture);
+  return stop;
+}

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
 import { createPortal } from 'react-dom';
 import type { Item } from '../lib/catalog';
+import { watchDragPointer } from '../lib/pointerDragSession';
 import { useItemAccess } from './ItemAccess';
 
 export function TodoLinkedItems({ items, onRemove, onRemoveInputs, requiredInputs }: { requiredInputs?:Record<string,number>; items: Item[]; onRemoveInputs:(ids:number[])=>void; onRemove: (id: number, removeInputs?:boolean) => void }) {
@@ -33,7 +34,8 @@ export function TodoLinkedItems({ items, onRemove, onRemoveInputs, requiredInput
   removeRef.current = onRemove;
   useEffect(() => () => cleanup.current?.(), []);
   function start(event: ReactPointerEvent, id:number) {
-    if(event.button !== 0) return;
+    if(event.button !== 0 || !event.isPrimary) return;
+    cleanup.current?.();
     event.preventDefault();
     suppressClick.current=false;
     const origin={x:event.clientX,y:event.clientY};
@@ -44,11 +46,7 @@ export function TodoLinkedItems({ items, onRemove, onRemoveInputs, requiredInput
     }
     function finish() {
       document.documentElement.classList.remove('task-item-dragging');
-      window.removeEventListener('pointermove',move,true);
-      window.removeEventListener('pointerup',up,true);
-      window.removeEventListener('pointercancel',cancel,true);
-      window.removeEventListener('blur',cancel);
-      document.removeEventListener('keydown',key,true);
+      stopWatching();
       setDrag(null);cleanup.current=undefined;
     }
     function move(e:PointerEvent) {
@@ -58,17 +56,12 @@ export function TodoLinkedItems({ items, onRemove, onRemoveInputs, requiredInput
       setDrag({id,x:e.clientX,y:e.clientY,outside:outside(e.clientX,e.clientY)});
     }
     function up(e:PointerEvent) {
-      if(moved){e.preventDefault();e.stopPropagation();if(outside(e.clientX,e.clientY))requestRemove(id,e.clientX,e.clientY);}
-      finish();
+      try {
+        if(moved){e.preventDefault();e.stopPropagation();if(outside(e.clientX,e.clientY))requestRemove(id,e.clientX,e.clientY);}
+      } finally {finish();}
     }
-    function cancel(){finish();}
-    function key(e:KeyboardEvent){if(e.key==='Escape')cancel();}
-    cleanup.current?.();cleanup.current=finish;
-    window.addEventListener('pointermove',move,true);
-    window.addEventListener('pointerup',up,true);
-    window.addEventListener('pointercancel',cancel,true);
-    window.addEventListener('blur',cancel);
-    document.addEventListener('keydown',key,true);
+    const stopWatching=watchDragPointer(event.nativeEvent,{move,up,cancel:finish});
+    cleanup.current=finish;
   }
   if(!items.length&&!prompt)return <div className="todo-linked-items is-empty" aria-hidden="true"/>;
   const dragged=items.find(item=>item.id===drag?.id);

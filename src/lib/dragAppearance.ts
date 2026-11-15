@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { flushSync } from 'react-dom';
-import { createPointerDragSession, type DragPoint } from './pointerDragSession';
+import { createPointerDragSession, watchDragPointer, type DragPoint } from './pointerDragSession';
 
 // Existing source/target handlers keep their copy, reorder and validation rules.
 // Their DragEvents are dispatched inside the app, never handed to the OS.
@@ -62,7 +62,6 @@ export function useDelayedDragCursor(onFinish?: () => void) {
         end() {
           if (hovered) send(hovered, 'dragleave', latest);
           flushSync(() => { send(source, 'dragend', latest); finishRef.current?.(); });
-          document.documentElement.classList.remove('app-drag-active');
         },
       });
       // Scroll only the nearest scrollable ancestor under the pointer, while dragging.
@@ -89,8 +88,6 @@ export function useDelayedDragCursor(onFinish?: () => void) {
         if (session.active && autoScroll()) frame = requestAnimationFrame(tick);
       }
       function move(e: PointerEvent) {
-        if (e.pointerId !== event.pointerId) return;
-        if (!(e.buttons & 1)) { cancel(); return; }
         latest = {x:e.clientX,y:e.clientY};
         if (!frame) frame = requestAnimationFrame(tick);
       }
@@ -99,16 +96,10 @@ export function useDelayedDragCursor(onFinish?: () => void) {
         clearTimeout(hold); cancelAnimationFrame(frame);
         source.classList.remove('drag-held');
         document.documentElement.classList.remove('app-drag-active');
-        window.removeEventListener('pointermove',move,true);
-        window.removeEventListener('pointerup',up,true);
-        window.removeEventListener('pointercancel',cancel,true);
-        window.removeEventListener('blur',cancel);
-        document.removeEventListener('keydown',key,true);
-        document.removeEventListener('visibilitychange',visibility);
+        stopWatching();
         disposeGesture = undefined;
       }
       function up(e:PointerEvent) {
-        if (e.pointerId !== event.pointerId) return;
         latest={x:e.clientX,y:e.clientY};
         cancelAnimationFrame(frame);
         try {
@@ -118,15 +109,8 @@ export function useDelayedDragCursor(onFinish?: () => void) {
         } finally { cleanup(); }
       }
       function cancel() { try { session.cancel(); } finally { cleanup(); } }
-      function key(e:KeyboardEvent) { if(e.key==='Escape')cancel(); }
-      function visibility() { if(document.hidden)cancel(); }
+      const stopWatching = watchDragPointer(event, { move, up, cancel });
       disposeGesture = cancel;
-      window.addEventListener('pointermove',move,true);
-      window.addEventListener('pointerup',up,true);
-      window.addEventListener('pointercancel',cancel,true);
-      window.addEventListener('blur',cancel);
-      document.addEventListener('keydown',key,true);
-      document.addEventListener('visibilitychange',visibility);
     }
     function click(event: MouseEvent) {
       if (!suppressClick || event.detail===0) return;

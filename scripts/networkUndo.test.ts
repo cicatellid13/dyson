@@ -129,3 +129,33 @@ test('removing a main task item removes its attached inputs but preserves unrela
  assert.deepEqual(removeTaskItem(taskItemAttachment(catalog,{itemIds:[2]},1,true),1),{itemIds:[2],requiredInputs:{}});
  assert.deepEqual(removeTaskItem(linked,2).requiredInputs,{3:1});
 });
+
+test('drag tracking cancels a missed mouse release and removes its listeners', async () => {
+ const {watchDragPointer}=await import('../src/lib/pointerDragSession');
+ const dragWindow=new EventTarget(),dragDocument=new EventTarget();
+ const windowDescriptor=Object.getOwnPropertyDescriptor(globalThis,'window');
+ const documentDescriptor=Object.getOwnPropertyDescriptor(globalThis,'document');
+ Object.defineProperty(globalThis,'window',{configurable:true,value:dragWindow});
+ Object.defineProperty(globalThis,'document',{configurable:true,value:dragDocument});
+ function pointer(type:string,pointerId:number,buttons:number) {
+  return Object.assign(new Event(type),{pointerId,buttons,pointerType:'mouse'}) as PointerEvent;
+ }
+ try {
+  const events:string[]=[];
+  const stop=watchDragPointer(pointer('pointerdown',1,1),{
+   move:()=>events.push('move'),
+   up:()=>events.push('up'),
+   cancel:()=>{events.push('cancel');stop();},
+  });
+  dragWindow.dispatchEvent(pointer('pointermove',2,0));
+  dragWindow.dispatchEvent(pointer('pointermove',1,1));
+  dragWindow.dispatchEvent(pointer('pointermove',1,0));
+  dragWindow.dispatchEvent(pointer('pointerup',1,0));
+  assert.deepEqual(events,['move','cancel']);
+ } finally {
+  for(const [name,descriptor] of [['window',windowDescriptor],['document',documentDescriptor]] as const) {
+   if(descriptor)Object.defineProperty(globalThis,name,descriptor);
+   else Reflect.deleteProperty(globalThis,name);
+  }
+ }
+});

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type HTMLAttributes, type PointerEvent as ReactPointerEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { classifyPinDrop, pinToken, type PinDropSide, type PinItemSource, type PinId, type PinnedStripEntry, type PinnedGroupItem } from '../lib/pinnedItems';
-import { createPointerDragSession } from '../lib/pointerDragSession';
+import { createPointerDragSession, watchDragPointer } from '../lib/pointerDragSession';
 
 export function LocationPinIcon({kind}:{kind:'planet'|'system'}) {
   return <svg width="29" height="29" viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{kind==='planet'?<><circle cx="16" cy="16" r="9"/><ellipse cx="16" cy="16" rx="15" ry="4" transform="rotate(-28 16 16)"/></>:<><path d="m16 9 2 5 5 2-5 2-2 5-2-5-5-2 5-2 2-5Z" fill="currentColor" strokeWidth="1.2"/><path d="M8 5.5a13 13 0 0 1 19 17M24 26.5a13 13 0 0 1-19-17"/><circle cx="6" cy="7" r="2.3"/><circle cx="26" cy="25" r="2.3"/></>}</svg>;
@@ -14,7 +14,7 @@ export function PinItemButton({name, pinned, onClick, kind='item'}: {name:string
 }
 
 type Intent = {kind:'group';planet:string}|{kind:'group-reorder';planet:string;target:number}|{kind:'reorder';target:PinId|null;side:PinDropSide};
-type DragSource={id:PinId;planet?:string};
+type DragSource={id:PinId;planet?:string;reorderOnly?:boolean};
 type Props={items:PinnedStripEntry[];active:PinId|null;onSelect:(id:PinId)=>void;onClose:(id:PinId)=>void;onReorder:(source:PinId,target:PinId)=>void;onInsert:(id:PinId,target:PinId|null,side:PinDropSide,fromPlanet?:string)=>void;onStore:(planet:string,id:number,source:PinItemSource)=>void;onRemoveGrouped:(planet:string,id:number)=>void;onReorderGrouped:(planet:string,id:number,target:number)=>void;incomingItemId:number|null;acceptingItems?:boolean;dropActive?:boolean;dropProps?:Pick<HTMLAttributes<HTMLElement>,'onDragOver'|'onDragLeave'|'onDrop'>};
 
 export function PinnedItemStrip(props:Props) {
@@ -49,19 +49,19 @@ export function PinnedItemStrip(props:Props) {
   }
   function apply(source:DragSource,intent:Intent,outside:boolean) {
     const actions=current.current;
-    if(outside){if(source.planet&&typeof source.id==='number')actions.onRemoveGrouped(source.planet,source.id);else actions.onClose(source.id);return;}
+    if(outside){if(source.reorderOnly)return;if(source.planet&&typeof source.id==='number')actions.onRemoveGrouped(source.planet,source.id);else actions.onClose(source.id);return;}
     if(intent.kind==='group'&&typeof source.id==='number')actions.onStore(intent.planet,source.id,source.planet?{planet:source.planet}:'strip');
     else if(intent.kind==='group-reorder'&&typeof source.id==='number')actions.onReorderGrouped(intent.planet,source.id,intent.target);
     else if(intent.kind==='reorder')actions.onInsert(source.id,intent.target,intent.side,source.planet);
   }
   function start(event:ReactPointerEvent,source:DragSource){
-    if(event.button!==0)return;
+    if(event.button!==0||!event.isPrimary)return;
     event.preventDefault();event.stopPropagation();cleanup.current?.();suppressClick.current=false;
-    const pointerId=event.pointerId;let finished=false;
+    let finished=false;
     function finish(){
       if(finished)return;finished=true;
       document.documentElement.classList.remove('task-item-dragging');
-      window.removeEventListener('pointermove',move,true);window.removeEventListener('pointerup',up,true);window.removeEventListener('pointercancel',cancel,true);window.removeEventListener('blur',cancel);window.removeEventListener('resize',cancel);document.removeEventListener('keydown',key,true);
+      stopWatching();
       setDrag(null);cleanup.current=undefined;
     }
     const session=createPointerDragSession({x:event.clientX,y:event.clientY},{
@@ -69,11 +69,15 @@ export function PinnedItemStrip(props:Props) {
       over:point=>{setDrag({source,...point,...hit(point.x,point.y,source)});return true;},
       drop:point=>{const result=hit(point.x,point.y,source);apply(source,result.intent,result.outside);},end:finish,
     });
-    function move(event:PointerEvent){if(event.pointerId===pointerId)session.move({x:event.clientX,y:event.clientY});}
-    function up(event:PointerEvent){if(event.pointerId!==pointerId)return;if(session.release({x:event.clientX,y:event.clientY})){event.preventDefault();event.stopPropagation();}finish();}
-    function cancel(){session.cancel();finish();}
-    function key(event:KeyboardEvent){if(event.key==='Escape')cancel();}
-    cleanup.current=cancel;window.addEventListener('pointermove',move,true);window.addEventListener('pointerup',up,true);window.addEventListener('pointercancel',cancel,true);window.addEventListener('blur',cancel);window.addEventListener('resize',cancel);document.addEventListener('keydown',key,true);
+    function move(event:PointerEvent){session.move({x:event.clientX,y:event.clientY});}
+    function up(event:PointerEvent){
+      try {
+        if(session.release({x:event.clientX,y:event.clientY})){event.preventDefault();event.stopPropagation();}
+      } finally {finish();}
+    }
+    function cancel(){try {session.cancel();} finally {finish();}}
+    const stopWatching=watchDragPointer(event.nativeEvent,{move,up,cancel});
+    cleanup.current=cancel;
   }
   function open(event:React.MouseEvent,id:PinId){if(suppressClick.current&&event.detail!==0){suppressClick.current=false;return;}onSelect(id);}
   const intent=drag&&!drag.outside?drag.intent:incoming;
@@ -98,9 +102,12 @@ export function PinnedItemStrip(props:Props) {
     {items.map(item=>{
       const children=item.children??[],planet=String(item.id),grouped=item.kind==='planet'&&children.length>0;
       const grouping=intent?.kind==='group'&&intent.planet===item.id;
-      const insert=intent?.kind==='reorder'&&intent.target===item.id?`insert-${intent.side}`:'';
+      const insert=intent?.kind==='reorder'&&intent.target===item.id&&drag?.source.id!==item.id?`insert-${intent.side}`:'';
       const expanding=!!drag?.source.planet&&drag.source.planet===item.id||intent?.kind==='group-reorder'&&intent.planet===item.id;
       return <div data-pinned-unit={pinToken(item.id)} className={`pinned-unit ${grouped?'pinned-planet-group':''} ${grouping?'group-drop-target':''} ${insert} ${expanding?'group-dragging':''}`} key={item.id} role={grouped?'group':undefined} aria-label={grouped?`${item.name} pinned item group`:undefined}>
+        {grouped&&<span className="pinned-group-grip" data-tooltip="Drag to reorder planet group" aria-hidden="true" onPointerDown={event=>start(event,{id:item.id,reorderOnly:true})}>
+          <svg width="10" height="18" viewBox="0 0 10 18" fill="currentColor">{[4,9,14].map(y=><g key={y}><circle cx="3" cy={y} r="1"/><circle cx="7" cy={y} r="1"/></g>)}</svg>
+        </span>}
         <div className={`pinned-item ${active===item.id?'active':''}`}>
           <button type="button" className="pinned-item-open" data-planet-pin={item.kind==='planet'?'true':undefined} aria-label={item.name} aria-current={active===item.id?'page':undefined} data-tooltip={item.name} draggable={false} onPointerDown={event=>start(event,{id:item.id})} onClick={event=>open(event,item.id)}
             onKeyDown={event=>{
@@ -115,7 +122,7 @@ export function PinnedItemStrip(props:Props) {
         </div>}
       </div>;
     })}
-    {drag&&dragged&&createPortal(<div className={`todo-drag-ghost ${drag.outside?'removing':''}`} style={{left:drag.x-12,top:drag.y-10}}>{renderIcon(dragged)}{drag.outside&&<span aria-hidden="true">×</span>}</div>,document.body)}
+    {drag&&dragged&&createPortal(<div className={`todo-drag-ghost ${drag.outside&&!drag.source.reorderOnly?'removing':''}`} style={{left:drag.x-12,top:drag.y-10}}>{renderIcon(dragged)}{drag.outside&&!drag.source.reorderOnly&&<span aria-hidden="true">×</span>}</div>,document.body)}
     {intent?.kind==='group'&&<span className="pinned-group-drop-message" role="status">Drop to group with planet</span>}
   </nav>;
 }
