@@ -173,3 +173,21 @@ test('task attachment uses the chosen recipe for inputs and their parent links',
  assert.deepEqual(taskItemAttachment(catalog, {}, 1, true, 20), {itemIds:[1,3], requiredInputs:{3:1}});
  assert.deepEqual(taskItemAttachment(catalog, {}, 1, true, 30), {itemIds:[1], requiredInputs:{}});
 });
+
+test('quick switch finds destinations by name and system context', async () => {
+ const {quickSwitchEntries, searchQuickSwitch} = await import('../src/lib/quickSwitch');
+ const system = {id:'anchat', kind:'system', name:'Anchat', parentId:null, notes:'', imports:[], exports:[]} as const;
+ const planet = {
+   id:'vi', kind:'planet', name:'Anchat VI', parentId:system.id, notes:'', imports:[], exports:[],
+   checklist:[{id:'silo', text:'Build launch silos', done:false}],
+   factories:{rockets:{id:'rockets', name:'Rocket line'}},
+ } as unknown as import('../src/lib/design').DesignSection;
+ const entries = quickSwitchEntries([{id:1501, name:'Small Carrier Rocket'}] as Catalog['items'], [
+   {...system, imports:[], exports:[]}, planet,
+ ]);
+ assert.equal(searchQuickSwitch(entries, 'anchat vi')[0]?.kind, 'planet');
+ assert.equal(searchQuickSwitch(entries, 'SILOS anchat')[0]?.key, 'todo:vi:silo');
+ assert.equal(searchQuickSwitch(entries, 'rocket line')[0]?.key, 'factory:vi:rockets');
+ assert.equal(searchQuickSwitch(entries, 'carrier')[0]?.key, 'item:1501');
+ assert.deepEqual(searchQuickSwitch(entries, 'missing'), []);
+});

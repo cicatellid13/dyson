@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 
 interface DspWikiBridge {
+  onQuickSwitch: (callback: () => void) => () => void;
   listProfiles:()=>Promise<import('./lib/profiles').ProfileIndex>;
   switchProfile:(id:string,recovery?:{base:import('./lib/workspace').Workspace;data:import('./lib/workspace').Workspace})=>Promise<import('./lib/profiles').ProfileWorkspace>;
   createProfile:(name:string)=>Promise<import('./lib/profiles').ProfileWorkspace>;

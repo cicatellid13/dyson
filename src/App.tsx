@@ -1,3 +1,5 @@
+import { QuickSwitcher } from './components/QuickSwitcher';
+import { quickSwitchEntries, type QuickSwitchEntry } from './lib/quickSwitch';
 import { SphereDesignLab } from './components/SphereDesignLab';
 import { ProfileControl } from './components/ProfileControl';
 import { PinnedItemStrip, PinItemButton } from './components/PinnedItemStrip';
@@ -80,7 +82,8 @@ export function App(){
  const [favoriteSearch,setFavoriteSearch]=useState('');
  const [networkOverview,setTodoOverview]=useSessionSelection('network-todo-overview');const [activeLocation,setLocation]=useSessionSelection('logistics-location');const [,setGraph]=useSessionSelection('logistics-graph');const [,setSystemsExpanded]=useSessionExpansion('logistics-systems');
  const [networkRequest,setNetworkRequest]=useState<NetworkRequest|null>(null);const [,setEntriesExpanded]=useSessionExpansion('logistics-entries');const [,setFactoryPlanet]=useSessionSelection('logistics-factory-planet');const [,setFactoryFocus]=useSessionSelection('logistics-factory-focus');const [,setNetworkFocus]=useSessionSelection('logistics-network-focus');
- function openPlanet(id:string,entryId?:string,factoryId?:string){const planet=cloud.view.data.design.sections.find(s=>s.id===id&&s.kind==='planet');if(!planet)return;setTodoOverview(null);setLocation(id);setGraph(null);setNetworkFocus(JSON.stringify({entryId,factoryId,nonce:crypto.randomUUID()}));if(entryId)setEntriesExpanded(old=>new Set([...old,entryId]));if(factoryId){setFactoryPlanet(id);setFactoryFocus(factoryId);}if(planet.parentId)setSystemsExpanded(old=>new Set([...old,planet.parentId!]));selectCategory('Logistics Network');}
+ const [,setTodoPlanets]=useSessionExpansion('planet-notebook-todo');
+ function openPlanet(id:string,entryId?:string,factoryId?:string,taskId?:string){const planet=cloud.view.data.design.sections.find(s=>s.id===id&&s.kind==='planet');if(!planet)return;setTodoOverview(null);setLocation(id);setGraph(null);setNetworkFocus(JSON.stringify({entryId,factoryId,taskId,planetId:id,nonce:crypto.randomUUID()}));if(taskId)setTodoPlanets(old=>new Set([...old,id]));if(entryId)setEntriesExpanded(old=>new Set([...old,entryId]));if(factoryId){setFactoryPlanet(id);setFactoryFocus(factoryId);}if(planet.parentId)setSystemsExpanded(old=>new Set([...old,planet.parentId!]));selectCategory('Logistics Network');}
  const [plannerRequest,setPlannerRequest]=useState<{id:number;sequence:number;saved?:SavedFactory;planetId?:string}>();
  function planItem(id:number,saved?:SavedFactory,planetId?:string){setPlannerRequest(previous=>({id,saved,planetId,sequence:(previous?.sequence??0)+1}));setCategory('Factory Planner');}
  const [draggedItem,setDraggedItem]=useState<number|null>(null);
@@ -108,6 +111,32 @@ export function App(){
   updateWorkspace(data=>({...data,darkFog:next}));
  }
  const catalog=useMemo(()=>catalogForDarkFog(cloud.catalog ?? snapshot as unknown as Catalog,darkFog),[cloud.catalog,darkFog]);
+ const [quickSwitchOpen,setQuickSwitchOpen]=useState(false);
+ useEffect(()=>{
+   if(!cloud.ready || cloud.switching)return;
+   return window.dspWiki?.onQuickSwitch(()=>{
+     if(!document.querySelector('dialog[open]'))setQuickSwitchOpen(true);
+   });
+ },[cloud.ready,cloud.switching]);
+ const destinations=useMemo(()=>quickSwitchOpen
+   ? quickSwitchEntries(catalog.items,cloud.view.data.design.sections)
+   : [],[quickSwitchOpen,catalog.items,cloud.view.data.design.sections]);
+
+ function selectDestination(entry: QuickSwitchEntry) {
+   setQuickSwitchOpen(false);
+   switch(entry.kind) {
+     case 'item':
+       selectCategory('All items');
+       chooseItem(entry.itemId);
+       setGridDetail(true);
+       setGridOrigin(cloud.view.data.defaultCatalogView === 'grid');
+       break;
+     case 'planet': openPlanet(entry.planetId); break;
+     case 'factory': openPlanet(entry.planetId,undefined,entry.factoryId); break;
+     case 'todo': openPlanet(entry.planetId,undefined,undefined,entry.taskId); break;
+   }
+ }
+
  const [selected,setSelected]=useState(1303);
  const [history,setHistory]=useState<{id:number;category:string;detail:boolean;gridOrigin:boolean}[]>([]);
  const [gridOrigin,setGridOrigin]=useState(false);
@@ -247,7 +276,7 @@ export function App(){
  const activePinnedLocation=category==='Logistics Network'&&!networkOverview?cloud.view.data.design.sections.find(section=>section.id===activeLocation):undefined;
  if(!cloud.ready||cloud.switching)return <div className="boot"><h1>DSP Toolkit</h1><p>{cloud.switching?'Opening play-through…':cloud.error || 'Opening your shared workspace…'}</p>{cloud.error && <button onClick={()=>{void initializePersistence();}}>Retry connection</button>}</div>;
  function sidebarCategory(c:string){return <button className={`${category===c?'nav active':'nav'} ${(c==='Favorites'||c==='Factory Planner') && draggedItem!==null?'favorite-drop-ready':''} ${(c==='Favorites'||c==='Factory Planner') && favoriteDropTarget===c?'favorite-drop-active':''}`} {...((c==='Favorites'||c==='Factory Planner')?itemDropProps(c,c):{})} key={c} onClick={()=>selectCategory(c)}><span>{c==='All items'?'▦':c==='Favorites'?'☆':c==='Buildings'?'▤':<CategoryIcon category={c}/>}</span>{c}<small>{c==='All items'?catalog.items.length:c==='Favorites'?favorites.filter(id=>itemMap.has(id)).length:''}</small></button>;}
- return <ItemAccessContext.Provider value={{navigate,planet:openPlanet,network:(id,consumer)=>setNetworkRequest({id,consumer}),plan:planItem,drag:setDraggedItem}}><div className="app-shell dark-fog-normal"><RecipePreview catalog={catalog}/>{networkRequest&&<NetworkSearch key={networkRequest.id} request={networkRequest} catalog={catalog} onClose={()=>setNetworkRequest(null)}/>}{cloud.undoLabel&&<div className="removal-undo" role="status"><span>{cloud.undoError??cloud.undoLabel}</span><button onClick={undoRemoval}>Undo</button><button aria-label="Dismiss undo" onClick={dismissRemoval}>×</button></div>}
+ return <ItemAccessContext.Provider value={{navigate,planet:openPlanet,network:(id,consumer)=>setNetworkRequest({id,consumer}),plan:planItem,drag:setDraggedItem}}><div className="app-shell dark-fog-normal"><RecipePreview catalog={catalog}/>{quickSwitchOpen&&<QuickSwitcher entries={destinations} onSelect={selectDestination} onClose={()=>setQuickSwitchOpen(false)}/>}{networkRequest&&<NetworkSearch key={networkRequest.id} request={networkRequest} catalog={catalog} onClose={()=>setNetworkRequest(null)}/>}{cloud.undoLabel&&<div className="removal-undo" role="status"><span>{cloud.undoError??cloud.undoLabel}</span><button onClick={undoRemoval}>Undo</button><button aria-label="Dismiss undo" onClick={dismissRemoval}>×</button></div>}
  {favoriteNotice && <div className="favorite-drop-notice" role="status">{favoriteNotice}</div>}<aside className="sidebar"><div className="brand"><img className="brand-logo" src={`${import.meta.env.BASE_URL}art/toolkit-logo.png`} alt=""/><div><strong>TOOLKIT</strong><small>DYSON SPHERE PROGRAM</small></div></div><ProfileControl/><div className="nav-caption">YOUR LIBRARY</div><nav aria-label="Item categories"><div className="all-items-nav-row">{sidebarCategory('All items')}<button className="category-expand" aria-label={categoriesExpanded?'Collapse item categories':'Expand item categories'} aria-expanded={categoriesExpanded} aria-controls="sidebar-item-categories" onClick={()=>setCategoriesExpanded(value=>!value)}><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true" style={{transform:categoriesExpanded?'rotate(90deg)':undefined}}><path d="m6 3 5 5-5 5"/></svg></button></div><div id="sidebar-item-categories" className="sidebar-subcategories" hidden={!categoriesExpanded}>{categories.filter(c=>!['All items','Favorites','Logistics Network','Factory Planner','Sphere Design Lab','Scratch Pad'].includes(c)&&(c==='Buildings'||catalog.items.some(i=>catalog.categories[i.type]===c))).map(sidebarCategory)}</div>{['Favorites','Logistics Network','Factory Planner','Sphere Design Lab','Scratch Pad'].map(sidebarCategory)}</nav><div className="offline"><span className="status-dot"/> {cloud.view.status==='synced'?'Cloud synced':cloud.view.status==='pending'?'Saving changes…':cloud.view.status==='conflict'?'Sync conflict':'Offline · saved locally'}</div><footer><a key={selected} className="sidebar-wiki" href={itemMap.get(selected)?.overviewSource??browserUrlForTitle(itemMap.get(selected)?.name??'Dyson Sphere Program Wiki')} onClick={e=>{e.preventDefault();openInBrowser(e.currentTarget.href);}}>View wiki ↗</a><a href="https://www.fandom.com/licensing" onClick={e=>{e.preventDefault();openInBrowser(e.currentTarget.href);}}>Content attribution & licensing ↗</a></footer><button type="button" className="dark-fog-toggle" role="switch" aria-checked={darkFog} onClick={toggleDarkFog}><span className="dark-fog-switch" aria-hidden="true"/><span>Dark Fog</span></button><UpdateControl/></aside>
  <main className="workspace"><header className="topbar"><span>FACTORY REFERENCE <span className="slash">/</span> {category==='Logistics Network'?'LOGISTICS NETWORK':category==='Scratch Pad'?'SCRATCH PAD':category==='Factory Planner'?'FACTORY PLANNER':category==='Sphere Design Lab'?'SPHERE DESIGN LAB':'ITEM LIBRARY'}</span></header><section className="sphere-header" aria-label="Dysons Sphere">
    <img className="sphere-galaxy" src={`${import.meta.env.BASE_URL}art/galaxy-header.png`} alt="Panoramic galaxy surrounding a brilliant golden star with orbital collectors for a Dyson sphere"/>

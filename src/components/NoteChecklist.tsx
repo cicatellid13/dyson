@@ -9,7 +9,7 @@ import { reorderTodos } from '../lib/reorderTodos';
 import { TodoTypeIcon, todoTypeLabels as labels } from './TodoTypeIcon';
 import { useEffect, useId, useRef, useState } from 'react';
 import { todoTypes, type TodoType, type ChecklistItem } from '../lib/planning';
-export function NoteChecklist({catalog,entries,onChange,focusTaskId}:{focusTaskId?:string|null;catalog:Catalog;entries:ChecklistItem[];onChange:(entries:ChecklistItem[])=>void}){
+export function NoteChecklist({catalog,entries,onChange,focusTaskId,focusRequest}:{focusTaskId?:string|null;focusRequest?:string;catalog:Catalog;entries:ChecklistItem[];onChange:(entries:ChecklistItem[])=>void}){
  const actions = useItemAccess();
  const itemMap = new Map(catalog.items.map(item => [item.id, item]));
  const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -58,7 +58,7 @@ export function NoteChecklist({catalog,entries,onChange,focusTaskId}:{focusTaskI
    });
    const timer=window.setTimeout(()=>document.querySelectorAll('.network-task-highlight').forEach(el=>el.classList.remove('network-task-highlight')),2200);
    return()=>{cancelAnimationFrame(frame);clearTimeout(timer);};
- },[focusTaskId]);
+ },[focusTaskId,focusRequest]);
  const [choosing,setChoosing]=useState(false);
  const [newId,setNewId]=useState<string|null>(null);
  function add(type:TodoType|'untyped'){const id=crypto.randomUUID();onChange([...entries,{id,type:type==='untyped'?undefined:type,text:'',done:false}]);setNewId(id);setChoosing(false);setFilter(type);}

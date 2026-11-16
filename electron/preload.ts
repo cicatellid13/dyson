@@ -1,5 +1,9 @@
 import { contextBridge, ipcRenderer } from 'electron';
 contextBridge.exposeInMainWorld('dspWiki', {
+  onQuickSwitch: (callback: () => void) => {
+    ipcRenderer.on('quick-switch', callback);
+    return () => ipcRenderer.removeListener('quick-switch', callback);
+  },
   getUpdateState: () => ipcRenderer.invoke('update-state'),
   checkUpdate: () => ipcRenderer.invoke('update-check'),
   installUpdate: () => ipcRenderer.invoke('update-install'),

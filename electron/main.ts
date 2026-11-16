@@ -52,6 +52,12 @@ app.on('before-quit', event => {
 });
 function createWindow(){
   const win=new BrowserWindow({width:1400,height:960,minWidth:900,minHeight:650,title:'DSP Toolkit',backgroundColor:'#101719',webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,nodeIntegration:false,sandbox:true}});
+  win.webContents.on('before-input-event', (event, input) => {
+    const modifier = process.platform === 'darwin' ? input.meta && !input.control : input.control && !input.meta;
+    if (input.type !== 'keyDown' || !modifier || input.alt || input.shift || input.key.toLowerCase() !== 'w') return;
+    event.preventDefault();
+    if (!input.isAutoRepeat) win.webContents.send('quick-switch');
+  });
   win.on('focus', () => { void persistence?.sync(); });
   win.webContents.setWindowOpenHandler(({url})=>{void safeExternal(url);return {action:'deny'};});
   win.webContents.on('will-navigate',(event,url)=>{event.preventDefault();void safeExternal(url);});
